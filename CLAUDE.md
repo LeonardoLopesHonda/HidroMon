@@ -6,25 +6,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Start Expo development server
-npm start
+bun start
 
 # Run on specific platforms
-npm run android        # Android emulator
-npm run ios           # iOS simulator
-npm run web           # Web browser
+bun run android        # Android emulator
+bun run ios           # iOS simulator
+bun run web           # Web browser
 
 # Code quality
-npm run lint          # Run ESLint
+bun run lint          # Run ESLint
 
 # Reset to blank starter state
-npm run reset-project
+bun run reset-project
 ```
 
-**Package Manager:** Bun (lock file: `bun.lock`), though npm commands work.
+**Package Manager:** Bun (lock file: `bun.lock`)
 
 **Starting Development:**
-1. `npm install` (or `bun install`)
-2. `npm start`
+1. `bun install`
+2. `bun start`
 3. Press `w` for web, `a` for Android, `i` for iOS, or scan QR with Expo Go
 
 ## Architecture
