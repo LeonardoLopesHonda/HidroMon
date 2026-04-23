@@ -1,0 +1,6 @@
+{
+  "enabledMcpjsonServers": [
+    "react-native-expo",
+    "expo-sdk"
+  ]
+}

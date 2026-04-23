@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "react-native-expo": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@divagnz/mcp-react-native-expo"]
+    },
+    "expo-sdk": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "expo-mcp-server"]
+    }
+  }
+}
