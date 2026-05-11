@@ -1,43 +1,47 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# ── Logs ───────────────────────────────────────────────────────
+mobile/logs/
+backend/logs/
 
-# dependencies
+# ── Mobile (Expo) ──────────────────────────────────────────────
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+mobile/expo-env.d.ts
+mobile/.kotlin/
+mobile/ios/
+mobile/android/
+mobile/*.tsbuildinfo
+mobile/app-example/
+
+# ── Backend (FastAPI / Python) ─────────────────────────────────
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/.venv/
+backend/venv/
+backend/.env
+backend/.env.*
+backend/*.egg-info/
+backend/dist/
+backend/.pytest_cache/
+
+# ── Root-level artifacts (from pre-monorepo structure) ────────
 node_modules/
-
-# Expo
 .expo/
-dist/
-web-build/
 expo-env.d.ts
 
-# Native
-.kotlin/
+# ── General ────────────────────────────────────────────────────
+.DS_Store
+*.pem
 *.orig.*
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# debug
 npm-debug.*
 yarn-debug.*
 yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
+.metro-health-check*
 .env*.local
-
-# typescript
-*.tsbuildinfo
-
-app-example
-
-# generated native folders
-/ios
-/android

@@ -1,71 +1,66 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with this repository.
 
-## Build & Development Commands
+## Monorepo Structure
 
-```bash
-# Start Expo development server
-bun start
-
-# Run on specific platforms
-bun run android        # Android emulator
-bun run ios           # iOS simulator
-bun run web           # Web browser
-
-# Code quality
-bun run lint          # Run ESLint
-
-# Reset to blank starter state
-bun run reset-project
+```
+/
+├── mobile/    ← Expo app (React Native + TypeScript)
+├── backend/   ← FastAPI API (Python) — to be scaffolded
+├── docs/adr/  ← Architecture decision records
+├── CONTEXT.md ← Domain glossary and known issues
+└── README.md
 ```
 
-**Package Manager:** Bun (lock file: `bun.lock`)
+## Mobile App (mobile/)
 
-**Starting Development:**
-1. `bun install`
-2. `bun start`
-3. Press `w` for web, `a` for Android, `i` for iOS, or scan QR with Expo Go
+**Package Manager:** Bun
 
-## Architecture
+```bash
+cd mobile
+
+bun install           # Install dependencies
+bun start             # Start Expo dev server (w=web, a=Android, i=iOS)
+bun run android       # Android emulator
+bun run ios           # iOS simulator
+bun run web           # Web browser
+bun run lint          # Run ESLint
+```
 
 **Stack:** React Native 0.81 + Expo 54 + TypeScript + Expo Router (file-based routing)
 
-### Routing Structure
+### Routing (mobile/app/)
 
-Routes are defined by file structure in `/app`:
-- `app/_layout.tsx` - Root layout with theme provider and stack navigation
-- `app/(tabs)/` - Tab group containing bottom tab screens
-- `app/(tabs)/_layout.tsx` - Tab navigator configuration
-- `app/modal.tsx` - Modal screen presentation
+- `app/_layout.tsx` — root layout, stack navigation
+- `app/index.tsx` — splash / auth redirect
+- `app/auth.tsx` — login screen
+- `app/(app)/areas.tsx` — areas list
+- `app/(app)/[areaId]/index.tsx` — monitoring type selection
+- `app/(app)/[areaId]/[type]/index.tsx` — monitored items list
+- `app/(app)/[areaId]/[type]/[itemId]/index.tsx` — item detail + readings
+- `app/(app)/[areaId]/[type]/[itemId]/form.tsx` — add/edit reading
 
-### Theming System
+### Key Directories
 
-- Light/dark mode support via `useColorScheme()` hook
-- Theme colors defined in `constants/theme.ts`
-- `useThemeColor()` hook resolves colors based on current theme
-- Components `ThemedText` and `ThemedView` for consistent theming
+- `mobile/components/ui/` — UI primitives (Card, Button, FAB, StatsCard, etc.)
+- `mobile/context/AppContext.tsx` — global state and AsyncStorage persistence
+- `mobile/types/index.ts` — domain types (Area, MonitoredItem, Reading, etc.)
+- `mobile/data/mockData.ts` — seed data for first run
+- `mobile/constants/theme.ts` — colors, typography, spacing
 
-### Platform-Specific Code
+### Path Alias
 
-- Use `.ios.tsx` and `.web.ts` suffixes for platform-specific implementations
-- Example: `components/ui/icon-symbol.tsx` (default) vs `icon-symbol.ios.tsx` (iOS-specific)
-- Hooks have web variants: `hooks/use-color-scheme.web.ts`
+`@/*` maps to `mobile/*`
 
-### Component Organization
+### Known Issues
 
-- `/components` - Reusable UI components
-- `/components/ui` - Lower-level UI primitives (icons, collapsible)
-- `/hooks` - Custom React hooks for theming and platform detection
-- `/constants` - Theme colors and fonts
+See `CONTEXT.md` → Known Issues section for bugs and missing model fields that must be addressed before FastAPI integration.
 
-### Key Patterns
+## Backend (backend/)
 
-- Animations use `react-native-reanimated` (parallax scrolling, wave animation)
-- Haptic feedback via `expo-haptics` (iOS only)
-- External links open in-app browser on native via `expo-web-browser`
-- Path alias `@/*` maps to project root
+FastAPI + Python — not yet scaffolded. See `docs/adr/0001-offline-first-sync.md` for the sync contract the API must implement.
 
 ## Testing
 
-No test infrastructure is currently configured. Tests would need to be added.
+No test infrastructure is currently configured.
