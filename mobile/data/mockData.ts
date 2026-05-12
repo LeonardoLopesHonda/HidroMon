@@ -12,31 +12,21 @@ function makePRNG(seed: number) {
 const rng = makePRNG(42);
 
 export const MOCK_AREAS: Area[] = [
-  { id: 'monjolinho', name: 'Monjolinho' },
-  { id: 'lais', name: 'Laís' },
+  { id: 'monjolinho', name: 'Monjolinho', frequency: 'daily' },
+  { id: 'lais', name: 'Laís', frequency: 'weekly' }, // decommissioned site
 ];
 
 export const MOCK_ITEMS: MonitoredItem[] = [
   // Monjolinho — Hidrômetros
-  { id: 'mon-h1', areaId: 'monjolinho', name: 'Hidrômetro 01', type: 'hidrometro', limiteOutorgado: 3000, unit: 'm³' },
-  { id: 'mon-h2', areaId: 'monjolinho', name: 'Hidrômetro 02', type: 'hidrometro', limiteOutorgado: 2500, unit: 'm³' },
-  { id: 'mon-h3', areaId: 'monjolinho', name: 'Hidrômetro 03', type: 'hidrometro', limiteOutorgado: 1800, unit: 'm³' },
+  { id: 'mon-h1', areaId: 'monjolinho', name: 'Hidrômetro 01', type: 'hidrometro', limiteOutorgado: 3000, horasOperacao: 24, unit: 'm³' },
+  { id: 'mon-h2', areaId: 'monjolinho', name: 'Hidrômetro 02', type: 'hidrometro', limiteOutorgado: 2500, horasOperacao: 24, unit: 'm³' },
+  { id: 'mon-h3', areaId: 'monjolinho', name: 'Hidrômetro 03', type: 'hidrometro', limiteOutorgado: 1800, horasOperacao: 20, unit: 'm³' },
   // Monjolinho — Pluviômetros
-  { id: 'mon-p1', areaId: 'monjolinho', name: 'Pluviômetro 01', type: 'pluviometro', limiteOutorgado: 500, unit: 'mm' },
-  { id: 'mon-p2', areaId: 'monjolinho', name: 'Pluviômetro 02', type: 'pluviometro', limiteOutorgado: 500, unit: 'mm' },
-  // Monjolinho — Córregos
-  { id: 'mon-c1', areaId: 'monjolinho', name: 'Córrego Monjolinho', type: 'corrego', limiteOutorgado: 0.5, unit: 'm³/s' },
-  { id: 'mon-c2', areaId: 'monjolinho', name: 'Córrego Tabatinga', type: 'corrego', limiteOutorgado: 0.3, unit: 'm³/s' },
-  // Laís — Hidrômetros
-  { id: 'lais-h1', areaId: 'lais', name: 'Hidrômetro 01', type: 'hidrometro', limiteOutorgado: 2200, unit: 'm³' },
-  { id: 'lais-h2', areaId: 'lais', name: 'Hidrômetro 02', type: 'hidrometro', limiteOutorgado: 2200, unit: 'm³' },
-  { id: 'lais-h3', areaId: 'lais', name: 'Hidrômetro 03', type: 'hidrometro', limiteOutorgado: 1500, unit: 'm³' },
-  // Laís — Pluviômetros
-  { id: 'lais-p1', areaId: 'lais', name: 'Pluviômetro 01', type: 'pluviometro', limiteOutorgado: 500, unit: 'mm' },
-  { id: 'lais-p2', areaId: 'lais', name: 'Pluviômetro 02', type: 'pluviometro', limiteOutorgado: 500, unit: 'mm' },
-  // Laís — Córregos
-  { id: 'lais-c1', areaId: 'lais', name: 'Córrego das Laís', type: 'corrego', limiteOutorgado: 0.4, unit: 'm³/s' },
-  { id: 'lais-c2', areaId: 'lais', name: 'Córrego Pedregulho', type: 'corrego', limiteOutorgado: 0.25, unit: 'm³/s' },
+  { id: 'mon-p1', areaId: 'monjolinho', name: 'Pluviômetro 01', type: 'pluviometro', limiteOutorgado: 0, horasOperacao: 24, unit: 'mm' },
+  { id: 'mon-p2', areaId: 'monjolinho', name: 'Pluviômetro 02', type: 'pluviometro', limiteOutorgado: 0, horasOperacao: 24, unit: 'mm' },
+  // Laís (decommissioned) — Córregos only
+  { id: 'lais-c1', areaId: 'lais', name: 'Córrego das Laís', type: 'corrego', limiteOutorgado: 0, horasOperacao: 24, unit: 'm³/s' },
+  { id: 'lais-c2', areaId: 'lais', name: 'Córrego Pedregulho', type: 'corrego', limiteOutorgado: 0, horasOperacao: 24, unit: 'm³/s' },
 ];
 
 function addDays(dateStr: string, days: number): string {
@@ -87,6 +77,8 @@ function generateReadings(): Reading[] {
           itemId: item.id,
           date,
           values,
+          isDirty: false,
+          syncedAt: null,
         });
       }
     }

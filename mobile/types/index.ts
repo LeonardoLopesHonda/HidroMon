@@ -3,6 +3,7 @@ export type MonitoringType = 'hidrometro' | 'pluviometro' | 'corrego';
 export interface Area {
   id: string;
   name: string;
+  frequency: 'daily' | 'weekly';
 }
 
 export interface MonitoredItem {
@@ -11,6 +12,7 @@ export interface MonitoredItem {
   name: string;
   type: MonitoringType;
   limiteOutorgado: number;
+  horasOperacao: number; // artesian wells = 20h, surface captures = 24h
   unit: string;
 }
 
@@ -20,6 +22,8 @@ export interface Reading {
   date: string; // YYYY-MM-DD
   values: Record<string, number>;
   observacoes?: string;
+  isDirty: boolean;
+  syncedAt: string | null;
 }
 
 export interface ReadingStats {
@@ -27,7 +31,7 @@ export interface ReadingStats {
   media: number;
   maximo: number;
   minimo: number;
-  diasSemLeitura: number;
+  diasSemLeitura: number | null; // null for weekly-cadence areas
   limiteOutorgado: number;
   unit: string;
   primaryKey: string;

@@ -52,8 +52,8 @@ export function StatsCard({ stats }: Props) {
         <StatTile label="Mínimo" value={formatValue(stats.minimo, stats.unit)} />
         <StatTile
           label="Dias sem leitura"
-          value={`${stats.diasSemLeitura} dias`}
-          alert={stats.diasSemLeitura > 5}
+          value={stats.diasSemLeitura !== null ? `${stats.diasSemLeitura} dias` : '—'}
+          alert={stats.diasSemLeitura !== null && stats.diasSemLeitura > 5}
         />
         <StatTile
           label="Limite outorgado"

@@ -45,3 +45,4 @@ yarn-debug.*
 yarn-error.*
 .metro-health-check*
 .env*.local
+logs

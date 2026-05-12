@@ -24,8 +24,24 @@ const PRIMARY_VALUE_KEY: Record<MonitoringType, string> = {
   corrego: 'vazao',
 };
 
+function generateId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
+}
+
+function countWorkdaysInMonth(year: number, month: number): number {
+  const days = getDaysInMonth(year, month);
+  let count = 0;
+  for (let d = 1; d <= days; d++) {
+    if (new Date(year, month - 1, d).getDay() !== 0) count++; // exclude Sundays
+  }
+  return count;
 }
 
 interface AppContextValue {
@@ -39,7 +55,8 @@ interface AppContextValue {
   readings: Reading[];
   isDataLoading: boolean;
 
-  addReading: (reading: Omit<Reading, 'id'>) => Promise<void>;
+  addReading: (reading: Omit<Reading, 'id' | 'isDirty' | 'syncedAt'>) => Promise<void>;
+  updateReading: (id: string, patch: Partial<Omit<Reading, 'id'>>) => Promise<void>;
 
   getItemsByAreaAndType: (areaId: string, type: MonitoringType) => MonitoredItem[];
   getReadingsByItem: (itemId: string) => Reading[];
@@ -81,9 +98,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const rawReadings = pairs[2][1];
 
       if (rawAreas && rawItems && rawReadings) {
-        setAreas(JSON.parse(rawAreas));
-        setItems(JSON.parse(rawItems));
-        setReadings(JSON.parse(rawReadings));
+        // Migrate stored data to ensure new fields exist (backward compat with old AsyncStorage)
+        type RawArea = { id: string; name: string; frequency?: 'daily' | 'weekly' };
+        type RawItem = MonitoredItem & { horasOperacao?: number };
+        type RawReading = Reading & { isDirty?: boolean; syncedAt?: string | null };
+
+        const parsedAreas: Area[] = (JSON.parse(rawAreas) as RawArea[]).map((a) => ({
+          id: a.id,
+          name: a.name,
+          frequency: a.frequency ?? 'daily',
+        }));
+        const parsedItems: MonitoredItem[] = (JSON.parse(rawItems) as RawItem[]).map((i) => ({
+          ...i,
+          horasOperacao: i.horasOperacao ?? 24,
+        }));
+        const parsedReadings: Reading[] = (JSON.parse(rawReadings) as RawReading[]).map((r) => ({
+          ...r,
+          isDirty: r.isDirty ?? false,
+          syncedAt: r.syncedAt ?? null,
+        }));
+        setAreas(parsedAreas);
+        setItems(parsedItems);
+        setReadings(parsedReadings);
       } else {
         // First run: seed with mock data
         await AsyncStorage.multiSet([
@@ -117,9 +153,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addReading = useCallback(
-    async (reading: Omit<Reading, 'id'>) => {
-      const newReading: Reading = { ...reading, id: Date.now().toString() };
+    async (reading: Omit<Reading, 'id' | 'isDirty' | 'syncedAt'>) => {
+      const newReading: Reading = {
+        ...reading,
+        id: generateId(),
+        isDirty: true,
+        syncedAt: null,
+      };
       const updated = [...readings, newReading];
+      setReadings(updated);
+      await AsyncStorage.setItem(STORAGE_KEYS.readings, JSON.stringify(updated));
+    },
+    [readings]
+  );
+
+  const updateReading = useCallback(
+    async (id: string, patch: Partial<Omit<Reading, 'id'>>) => {
+      const updated = readings.map((r) =>
+        r.id === id ? { ...r, ...patch, isDirty: true, syncedAt: null } : r
+      );
       setReadings(updated);
       await AsyncStorage.setItem(STORAGE_KEYS.readings, JSON.stringify(updated));
     },
@@ -164,21 +216,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const item = items.find((i) => i.id === itemId);
       const type = item?.type ?? 'hidrometro';
       const primaryKey = PRIMARY_VALUE_KEY[type];
+      const area = areas.find((a) => a.id === item?.areaId);
+      const isWeekly = area?.frequency === 'weekly';
 
       const prefix = `${year}-${String(month).padStart(2, '0')}`;
-      const monthReadings = readings.filter(
-        (r) => r.itemId === itemId && r.date.startsWith(prefix)
-      );
+      const monthReadings = readings
+        .filter((r) => r.itemId === itemId && r.date.startsWith(prefix))
+        .sort((a, b) => a.date.localeCompare(b.date)); // chronological
 
       const values = monthReadings.map((r) => r.values[primaryKey] ?? 0);
-      const total = values.reduce((s, v) => s + v, 0);
-      const media = values.length > 0 ? total / values.length : 0;
+
+      let total = 0;
+      if (type === 'hidrometro') {
+        // Cumulative odometer: monthly consumption = last reading − first reading
+        total = values.length >= 2 ? values[values.length - 1] - values[0] : 0;
+      } else if (type === 'pluviometro') {
+        total = values.reduce((s, v) => s + v, 0);
+      }
+      // corrego: no consumption concept — total stays 0
+
+      const sum = values.reduce((s, v) => s + v, 0);
+      const media = values.length > 0 ? sum / values.length : 0;
       const maximo = values.length > 0 ? Math.max(...values) : 0;
       const minimo = values.length > 0 ? Math.min(...values) : 0;
 
       const daysWithReading = new Set(monthReadings.map((r) => r.date)).size;
-      const daysInMonth = getDaysInMonth(year, month);
-      const diasSemLeitura = daysInMonth - daysWithReading;
+      let diasSemLeitura: number | null = null;
+      if (!isWeekly) {
+        diasSemLeitura = Math.max(0, countWorkdaysInMonth(year, month) - daysWithReading);
+      }
 
       return {
         total: Math.round(total * 100) / 100,
@@ -191,7 +257,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         primaryKey,
       };
     },
-    [items, readings]
+    [areas, items, readings]
   );
 
   const value = useMemo<AppContextValue>(
@@ -205,6 +271,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       readings,
       isDataLoading,
       addReading,
+      updateReading,
       getItemsByAreaAndType,
       getReadingsByItem,
       getLastReadingByItem,
@@ -214,7 +281,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [
       user, login, logout, isAuthLoading,
       areas, items, readings, isDataLoading,
-      addReading, getItemsByAreaAndType, getReadingsByItem,
+      addReading, updateReading, getItemsByAreaAndType, getReadingsByItem,
       getLastReadingByItem, getLastReadingByArea, getStats,
     ]
   );
