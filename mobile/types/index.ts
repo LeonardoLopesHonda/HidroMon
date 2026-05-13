@@ -14,6 +14,7 @@ export interface MonitoredItem {
   limiteOutorgado: number;
   horasOperacao: number; // artesian wells = 20h, surface captures = 24h
   unit: string;
+  corregoMethod?: 'regua' | 'tambor'; // only set when type === 'corrego'
 }
 
 export interface Reading {
