@@ -2,25 +2,36 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Spacing, Typography } from '@/constants/theme';
-import { MonitoringType, Reading } from '@/types';
+import { MonitoredItem, MonitoringType, Reading } from '@/types';
 
 interface Props {
   reading: Reading;
   type: MonitoringType;
+  corregoMethod?: MonitoredItem['corregoMethod'];
 }
-
-const UNITS: Record<MonitoringType, string | null> = {
-  hidrometro: 'm³',
-  pluviometro: 'mm',
-  corrego: null,
-};
 
 function formatDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-');
   return `${day}/${month}/${year}`;
 }
 
-export function ReadingListItem({ reading, type }: Props) {
+function tamborAvgLs(values: Record<string, number>): { avg: string; ls: string } | null {
+  const { t1, t2, t3 } = values;
+  if (!t1 || !t2 || !t3) return null;
+  const avg = (t1 + t2 + t3) / 3;
+  return { avg: avg.toFixed(1), ls: (200 / avg).toFixed(2) };
+}
+
+function ValueRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.valueRow}>
+      <Text style={[Typography.caption, { color: Colors.gray500 }]}>{label}  </Text>
+      <Text style={[Typography.subhead, { color: Colors.black }]}>{value}</Text>
+    </View>
+  );
+}
+
+export function ReadingListItem({ reading, type, corregoMethod }: Props) {
   return (
     <View style={styles.row}>
       <View style={styles.dateBlock}>
@@ -31,20 +42,21 @@ export function ReadingListItem({ reading, type }: Props) {
 
       <View style={styles.valuesBlock}>
         {type === 'corrego' ? (
-          <>
-            <View style={styles.valueRow}>
-              <Text style={[Typography.caption, { color: Colors.gray500 }]}>Nível  </Text>
-              <Text style={[Typography.subhead, { color: Colors.black }]}>
-                {reading.values.nivel ?? '—'} cm
-              </Text>
-            </View>
-            <View style={styles.valueRow}>
-              <Text style={[Typography.caption, { color: Colors.gray500 }]}>Vazão  </Text>
-              <Text style={[Typography.subhead, { color: Colors.black }]}>
-                {reading.values.vazao ?? '—'} m³/s
-              </Text>
-            </View>
-          </>
+          corregoMethod === 'tambor' ? (
+            (() => {
+              const derived = tamborAvgLs(reading.values);
+              return derived ? (
+                <>
+                  <ValueRow label="Média" value={`${derived.avg} s`} />
+                  <ValueRow label="Vazão" value={`${derived.ls} L/s`} />
+                </>
+              ) : (
+                <Text style={[Typography.subhead, { color: Colors.gray400 }]}>—</Text>
+              );
+            })()
+          ) : (
+            <ValueRow label="Nível" value={`${reading.values.nivel ?? '—'} m`} />
+          )
         ) : (
           <Text style={[Typography.headline, { color: Colors.black }]}>
             {type === 'hidrometro'
@@ -53,7 +65,10 @@ export function ReadingListItem({ reading, type }: Props) {
           </Text>
         )}
         {reading.observacoes ? (
-          <Text style={[Typography.caption, { color: Colors.gray400, marginTop: 2 }]} numberOfLines={1}>
+          <Text
+            style={[Typography.caption, { color: Colors.gray400, marginTop: 2 }]}
+            numberOfLines={1}
+          >
             {reading.observacoes}
           </Text>
         ) : null}

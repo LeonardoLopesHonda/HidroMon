@@ -15,6 +15,8 @@ export const Colors = {
   gray900: '#171717',
   danger: '#FF3B30',
   dangerLight: '#FFF0EE',
+  success: '#22C55E',
+  successLight: '#F0FDF4',
 } as const;
 
 export const Typography = StyleSheet.create({

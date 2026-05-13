@@ -65,7 +65,7 @@ export default function ItemDetailScreen() {
         data={filteredReadings}
         keyExtractor={(item: Reading) => item.id}
         renderItem={({ item: reading }) => (
-          <ReadingListItem reading={reading} type={type!} />
+          <ReadingListItem reading={reading} type={type!} corregoMethod={item?.corregoMethod} />
         )}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={

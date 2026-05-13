@@ -18,11 +18,10 @@ const MOCK_PASSWORDS: Record<string, string> = {
   telos: 'telos2024',
 };
 
-const PRIMARY_VALUE_KEY: Record<MonitoringType, string> = {
-  hidrometro: 'leitura',
-  pluviometro: 'precipitacao',
-  corrego: 'vazao',
-};
+function getPrimaryKey(item: MonitoredItem): string {
+  if (item.type === 'corrego') return item.corregoMethod === 'tambor' ? 'avg' : 'nivel';
+  return item.type === 'hidrometro' ? 'leitura' : 'precipitacao';
+}
 
 function generateId(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -215,7 +214,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     (itemId: string, year: number, month: number): ReadingStats => {
       const item = items.find((i) => i.id === itemId);
       const type = item?.type ?? 'hidrometro';
-      const primaryKey = PRIMARY_VALUE_KEY[type];
+      const primaryKey = item ? getPrimaryKey(item) : 'leitura';
       const area = areas.find((a) => a.id === item?.areaId);
       const isWeekly = area?.frequency === 'weekly';
 
@@ -224,7 +223,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .filter((r) => r.itemId === itemId && r.date.startsWith(prefix))
         .sort((a, b) => a.date.localeCompare(b.date)); // chronological
 
-      const values = monthReadings.map((r) => r.values[primaryKey] ?? 0);
+      // Extract the primary value per reading (tambor uses derived avg)
+      const values = monthReadings.map((r) => {
+        if (item?.corregoMethod === 'tambor') {
+          const { t1 = 0, t2 = 0, t3 = 0 } = r.values;
+          return t1 > 0 && t2 > 0 && t3 > 0 ? (t1 + t2 + t3) / 3 : 0;
+        }
+        const key = type === 'hidrometro' ? 'leitura' : type === 'pluviometro' ? 'precipitacao' : 'nivel';
+        return r.values[key] ?? 0;
+      });
 
       let total = 0;
       if (type === 'hidrometro') {
