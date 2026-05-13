@@ -43,26 +43,29 @@ A field data-capture app for **Vetria Mineração S.A.** to replace manual sprea
 | M-6 | `MonitoredItem.horasOperacao: number` | ✅ |
 | M-7 | `Reading.isDirty: boolean` + `Reading.syncedAt: string \| null` | ✅ |
 | M-8 | UUID v4 IDs on readings (replaced `Date.now()`) | ✅ |
-| M-9 | Mock data aligned with domain: Laís = decommissioned (weekly, córregos only) | ✅ |
+| M-9 | Mock data aligned with domain (real asset counts — see below) | 🔲 | Needs update: 5 hidrômetros + 1 pluviômetro on Monjolinho; 3 pluviômetros + 3 córregos on Laís |
 | M-10 | AsyncStorage migration for pre-fix stored data (backward compat) | ✅ |
+| M-11 | `MonitoredItem.corregoMethod: 'regua' \| 'tambor'` | 🔲 | Determines which fields the córrego form renders |
 
 ### Business logic
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| M-11 | `getStats` rewrite: hidrômetro uses `last − first`, pluviômetro sums, córrego skips total | ✅ | |
-| M-12 | `diasSemLeitura` excludes Sundays; returns `null` for weekly-cadence areas | ✅ | |
-| M-13 | `updateReading` operation in AppContext (full edit, marks `isDirty: true`) | ✅ | |
-| M-14 | Monthly cap display: `limiteOutorgado × horasOperacao × daysInMonth` | 🔲 | StatsCard currently shows raw `limiteOutorgado`; needs derived cap |
-| M-15 | Discriminated union for `MonitoredItem` by type | 🔲 | `limiteOutorgado` is vacuous on pluviômetro/córrego — structural smell in CONTEXT.md |
+| M-12 | `getStats` rewrite: hidrômetro uses `last − first`, pluviômetro sums, córrego skips total | ✅ | |
+| M-13 | `diasSemLeitura` excludes Sundays; returns `null` for weekly-cadence areas | ✅ | |
+| M-14 | `updateReading` operation in AppContext (full edit, marks `isDirty: true`) | ✅ | |
+| M-15 | `getPrimaryKey(item)` replaces static `PRIMARY_VALUE_KEY` — córrego régua uses `nivel`, tambor uses derived avg | 🔲 | Needed for correct stats on córrego items |
+| M-16 | Monthly cap display: `limiteOutorgado × horasOperacao × daysInMonth` | 🔲 | StatsCard currently shows raw `limiteOutorgado`; needs derived cap |
+| M-17 | Discriminated union for `MonitoredItem` by type | 🔲 | `limiteOutorgado` is vacuous on pluviômetro/córrego — structural smell in CONTEXT.md |
 
 ### UI / screens
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| M-16 | Reading list item shows sync status badge (dirty vs synced) | 🔲 | `isDirty` flag exists; no UI indicator yet |
-| M-17 | Edit reading flow: form pre-populated from existing reading, calls `updateReading` | 🔲 | Form is add-only today; tap on a reading in list → open form in edit mode |
-| M-18 | Delete reading | 🔲 | Not defined yet — decide if needed before backend |
+| M-18 | Form customization per monitoring type (spec: `docs/superpowers/specs/2026-05-13-form-customization-design.md`) | 🔲 | Hidrômetro validation; régua + tambor forms; live flow previews |
+| M-19 | Reading list item shows sync status badge (dirty vs synced) | 🔲 | `isDirty` flag exists; no UI indicator yet |
+| M-20 | Edit reading flow: form pre-populated from existing reading, calls `updateReading` | 🔲 | Form is add-only today; tap on a reading in list → open form in edit mode |
+| M-21 | Delete reading | 🔲 | Not defined yet — decide if needed before backend |
 
 ---
 
@@ -103,4 +106,4 @@ These are blocked on backend being live.
 
 ## Immediate next step
 
-**B-1** — scaffold the FastAPI backend. The mobile data model is now stable enough to drive the API schema directly from `mobile/types/index.ts`.
+**M-18** — implement form customization per monitoring type (spec approved, ready to plan). After M-18, the mobile app is feature-complete for the demo and B-1 (FastAPI scaffold) becomes the next milestone.
