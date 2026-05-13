@@ -24,9 +24,10 @@ export const MOCK_ITEMS: MonitoredItem[] = [
   // Monjolinho — Pluviômetros
   { id: 'mon-p1', areaId: 'monjolinho', name: 'Pluviômetro 01', type: 'pluviometro', limiteOutorgado: 0, horasOperacao: 24, unit: 'mm' },
   { id: 'mon-p2', areaId: 'monjolinho', name: 'Pluviômetro 02', type: 'pluviometro', limiteOutorgado: 0, horasOperacao: 24, unit: 'mm' },
-  // Laís (decommissioned) — Córregos only
-  { id: 'lais-c1', areaId: 'lais', name: 'Córrego das Laís', type: 'corrego', limiteOutorgado: 0, horasOperacao: 24, unit: 'm³/s' },
-  { id: 'lais-c2', areaId: 'lais', name: 'Córrego Pedregulho', type: 'corrego', limiteOutorgado: 0, horasOperacao: 24, unit: 'm³/s' },
+  // Laís (decommissioned) — Córregos only (2 régua + 1 tambor, method set in M-11)
+  { id: 'lais-c1', areaId: 'lais', name: 'Córrego das Pedras', type: 'corrego', limiteOutorgado: 0, horasOperacao: 24, unit: 'm³/s' },
+  { id: 'lais-c2', areaId: 'lais', name: 'Baia Sul', type: 'corrego', limiteOutorgado: 0, horasOperacao: 24, unit: 'm³/s' },
+  { id: 'lais-c3', areaId: 'lais', name: 'Córrego Arigolândia', type: 'corrego', limiteOutorgado: 0, horasOperacao: 24, unit: 'm³/s' },
 ];
 
 function addDays(dateStr: string, days: number): string {
