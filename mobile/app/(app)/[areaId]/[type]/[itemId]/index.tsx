@@ -65,7 +65,17 @@ export default function ItemDetailScreen() {
         data={filteredReadings}
         keyExtractor={(item: Reading) => item.id}
         renderItem={({ item: reading }) => (
-          <ReadingListItem reading={reading} type={type!} corregoMethod={item?.corregoMethod} />
+          <ReadingListItem
+            reading={reading}
+            type={type!}
+            corregoMethod={item?.corregoMethod}
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/[areaId]/[type]/[itemId]/form' as never,
+                params: { areaId, type, itemId, readingId: reading.id },
+              })
+            }
+          />
         )}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={

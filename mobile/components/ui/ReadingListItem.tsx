@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { MonitoredItem, MonitoringType, Reading } from '@/types';
@@ -8,6 +8,7 @@ interface Props {
   reading: Reading;
   type: MonitoringType;
   corregoMethod?: MonitoredItem['corregoMethod'];
+  onPress?: () => void;
 }
 
 function formatDate(dateStr: string): string {
@@ -31,13 +32,18 @@ function ValueRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ReadingListItem({ reading, type, corregoMethod }: Props) {
+export function ReadingListItem({ reading, type, corregoMethod, onPress }: Props) {
   return (
-    <View style={styles.row}>
+    <Pressable
+      style={({ pressed }) => [styles.row, pressed && onPress && styles.rowPressed]}
+      onPress={onPress}
+      disabled={!onPress}
+    >
       <View style={styles.dateBlock}>
         <Text style={[Typography.footnote, { color: Colors.gray500 }]}>
           {formatDate(reading.date)}
         </Text>
+        {reading.isDirty && <View style={styles.dirtyDot} />}
       </View>
 
       <View style={styles.valuesBlock}>
@@ -73,7 +79,7 @@ export function ReadingListItem({ reading, type, corregoMethod }: Props) {
           </Text>
         ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -87,8 +93,18 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.gray100,
     backgroundColor: Colors.white,
   },
+  rowPressed: {
+    backgroundColor: Colors.gray50,
+  },
   dateBlock: {
     width: 80,
+    gap: 4,
+  },
+  dirtyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#F59E0B',
   },
   valuesBlock: {
     flex: 1,
