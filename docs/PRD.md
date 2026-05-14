@@ -43,9 +43,9 @@ A field data-capture app for **Vetria Mineração S.A.** to replace manual sprea
 | M-6 | `MonitoredItem.horasOperacao: number` | ✅ |
 | M-7 | `Reading.isDirty: boolean` + `Reading.syncedAt: string \| null` | ✅ |
 | M-8 | UUID v4 IDs on readings (replaced `Date.now()`) | ✅ |
-| M-9 | Mock data aligned with domain (real asset counts — see below) | 🔲 | Needs update: 5 hidrômetros + 1 pluviômetro on Monjolinho; 3 pluviômetros + 3 córregos on Laís |
+| M-9 | Mock data aligned with domain (real asset counts — see below) | ✅ | 5 hidrômetros + 1 pluviômetro on Monjolinho; 3 pluviômetros + 3 córregos on Laís; real asset names |
 | M-10 | AsyncStorage migration for pre-fix stored data (backward compat) | ✅ |
-| M-11 | `MonitoredItem.corregoMethod: 'regua' \| 'tambor'` | 🔲 | Determines which fields the córrego form renders |
+| M-11 | `MonitoredItem.corregoMethod: 'regua' \| 'tambor'` | ✅ | Set per asset; drives form and stats logic |
 
 ### Business logic
 
@@ -54,7 +54,7 @@ A field data-capture app for **Vetria Mineração S.A.** to replace manual sprea
 | M-12 | `getStats` rewrite: hidrômetro uses `last − first`, pluviômetro sums, córrego skips total | ✅ | |
 | M-13 | `diasSemLeitura` excludes Sundays; returns `null` for weekly-cadence areas | ✅ | |
 | M-14 | `updateReading` operation in AppContext (full edit, marks `isDirty: true`) | ✅ | |
-| M-15 | `getPrimaryKey(item)` replaces static `PRIMARY_VALUE_KEY` — córrego régua uses `nivel`, tambor uses derived avg | 🔲 | Needed for correct stats on córrego items |
+| M-15 | `getPrimaryKey(item)` replaces static `PRIMARY_VALUE_KEY` — córrego régua uses `nivel`, tambor uses derived avg | ✅ | Implemented in AppContext; drives stats correctly per item type |
 | M-16 | Monthly cap display: `limiteOutorgado × horasOperacao × daysInMonth` | 🔲 | StatsCard currently shows raw `limiteOutorgado`; needs derived cap |
 | M-17 | Discriminated union for `MonitoredItem` by type | 🔲 | `limiteOutorgado` is vacuous on pluviômetro/córrego — structural smell in CONTEXT.md |
 
@@ -62,10 +62,19 @@ A field data-capture app for **Vetria Mineração S.A.** to replace manual sprea
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| M-18 | Form customization per monitoring type (spec: `docs/superpowers/specs/2026-05-13-form-customization-design.md`) | 🔲 | Hidrômetro validation; régua + tambor forms; live flow previews |
+| M-18 | Form customization per monitoring type (spec: `docs/superpowers/specs/2026-05-13-form-customization-design.md`) | ✅ | Hidrômetro validation + last-reading hint; régua + tambor forms; live flow previews (display-only) |
 | M-19 | Reading list item shows sync status badge (dirty vs synced) | 🔲 | `isDirty` flag exists; no UI indicator yet |
 | M-20 | Edit reading flow: form pre-populated from existing reading, calls `updateReading` | 🔲 | Form is add-only today; tap on a reading in list → open form in edit mode |
 | M-21 | Delete reading | 🔲 | Not defined yet — decide if needed before backend |
+| M-22 | Safe area insets on all `headerShown: false` screens | ✅ | `auth.tsx` was using hardcoded `paddingTop: 80`; replaced with `useSafeAreaInsets()` — required by `edgeToEdgeEnabled: true` on Android |
+| M-23 | Top border separator on authenticated Stack screens | ✅ | `headerShadowVisible: false` left no visual boundary between nav header and content; added `borderTopWidth: 1 / gray100` to `contentStyle` in app layout — applies to all screens from area detail through form |
+
+### Branding / Assets
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| M-24 | Telos logo with transparent background | ✅ | Original PNG had white background; `tintColor="white"` on the splash rendered a solid white square — white pixels converted to alpha 0 via Node.js PNG processor |
+| M-25 | App icon replacement across all targets | ✅ | Default Expo icon replaced with Telos orca logo: `icon.png` (white bg, 72% logo), Android adaptive foreground (transparent, 63% for safe zone), monochrome variant, favicon; `backgroundImage` template removed from `app.json` |
 
 ---
 
@@ -106,4 +115,10 @@ These are blocked on backend being live.
 
 ## Immediate next step
 
-**M-18** — implement form customization per monitoring type (spec approved, ready to plan). After M-18, the mobile app is feature-complete for the demo and B-1 (FastAPI scaffold) becomes the next milestone.
+UI polish is complete (M-22 – M-25). Remaining mobile items before backend work:
+
+1. **M-16** — Monthly cap display in StatsCard (`limiteOutorgado × horasOperacao × daysInMonth`)
+2. **M-20** — Edit reading flow (tap reading in list → open form pre-populated, calls `updateReading`)
+3. **M-19** — Sync status badge on ReadingListItem (`isDirty` flag exists, no UI yet)
+
+After these, **B-1** (FastAPI scaffold) becomes the next milestone.
