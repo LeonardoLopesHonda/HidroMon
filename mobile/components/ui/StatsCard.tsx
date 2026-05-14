@@ -41,23 +41,32 @@ function StatTile({
 }
 
 export function StatsCard({ stats }: Props) {
-  const overLimit = stats.total > stats.limiteOutorgado && stats.limiteOutorgado > 0;
+  const capToCompare = stats.monthlyCap > 0 ? stats.monthlyCap : stats.limiteOutorgado;
+  const overLimit = stats.total !== null && stats.total > capToCompare && capToCompare > 0;
 
   return (
     <View style={styles.card}>
       <View style={styles.grid}>
-        <StatTile label="Total" value={formatValue(stats.total, stats.unit)} alert={overLimit} />
-        <StatTile label="Média diária" value={formatValue(stats.media, stats.unit)} />
-        <StatTile label="Máximo" value={formatValue(stats.maximo, stats.unit)} />
-        <StatTile label="Mínimo" value={formatValue(stats.minimo, stats.unit)} />
+        <StatTile
+          label="Total"
+          value={stats.total !== null ? formatValue(stats.total, stats.unit) : '—'}
+          alert={overLimit}
+        />
+        <StatTile
+          label="Média diária"
+          value={stats.media !== null ? formatValue(stats.media, stats.unit) : '—'}
+        />
+        <StatTile label="Máximo" value={stats.maximo !== null ? formatValue(stats.maximo, stats.unit) : '—'} />
+        <StatTile label="Mínimo" value={stats.minimo !== null ? formatValue(stats.minimo, stats.unit) : '—'} />
         <StatTile
           label="Dias sem leitura"
           value={stats.diasSemLeitura !== null ? `${stats.diasSemLeitura} dias` : '—'}
           alert={stats.diasSemLeitura !== null && stats.diasSemLeitura > 5}
         />
         <StatTile
-          label="Limite outorgado"
-          value={formatValue(stats.limiteOutorgado, stats.unit)}
+          label="Cap. mensal"
+          value={stats.monthlyCap > 0 ? formatValue(stats.monthlyCap, stats.unit) : '—'}
+          alert={overLimit}
         />
       </View>
       {overLimit && (

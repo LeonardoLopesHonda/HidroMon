@@ -240,8 +240,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } else if (type === 'pluviometro') {
         total = values.reduce((s, v) => s + v, 0);
       }
-      // corrego: no consumption concept — total stays 0
-
       const sum = values.reduce((s, v) => s + v, 0);
       const media = values.length > 0 ? sum / values.length : 0;
       const maximo = values.length > 0 ? Math.max(...values) : 0;
@@ -253,13 +251,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         diasSemLeitura = Math.max(0, countWorkdaysInMonth(year, month) - daysWithReading);
       }
 
+      const limiteOutorgado = item?.limiteOutorgado ?? 0;
+      const monthlyCap =
+        item?.type === 'hidrometro' && limiteOutorgado > 0
+          ? limiteOutorgado * (item?.horasOperacao ?? 24) * 30
+          : 0;
+
       return {
-        total: Math.round(total * 100) / 100,
-        media: Math.round(media * 100) / 100,
-        maximo: Math.round(maximo * 100) / 100,
-        minimo: Math.round(minimo * 100) / 100,
+        total: type === 'corrego' ? null : Math.round(total * 100) / 100,
+        media:  type === 'hidrometro' ? null : Math.round(media * 100) / 100,
+        maximo: type === 'hidrometro' ? null : Math.round(maximo * 100) / 100,
+        minimo: type === 'hidrometro' ? null : Math.round(minimo * 100) / 100,
         diasSemLeitura,
-        limiteOutorgado: item?.limiteOutorgado ?? 0,
+        limiteOutorgado,
+        monthlyCap: Math.round(monthlyCap * 100) / 100,
         unit: item?.unit ?? '',
         primaryKey,
       };

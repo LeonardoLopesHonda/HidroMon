@@ -28,12 +28,13 @@ export interface Reading {
 }
 
 export interface ReadingStats {
-  total: number;
-  media: number;
-  maximo: number;
-  minimo: number;
+  total: number | null;   // null when not meaningful (córrego)
+  media: number | null;   // null when not meaningful (hidrômetro)
+  maximo: number | null;  // null when not meaningful (hidrômetro)
+  minimo: number | null;  // null when not meaningful (hidrômetro)
   diasSemLeitura: number | null; // null for weekly-cadence areas
   limiteOutorgado: number;
+  monthlyCap: number; // limiteOutorgado × horasOperacao × daysInMonth; 0 when not applicable
   unit: string;
   primaryKey: string;
 }

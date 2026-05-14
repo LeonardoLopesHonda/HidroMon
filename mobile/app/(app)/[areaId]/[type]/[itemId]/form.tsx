@@ -72,6 +72,11 @@ function toDateString(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+function parseDateString(str: string): Date {
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 function formatDisplayDate(date: Date): string {
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 }
@@ -83,21 +88,40 @@ function parseNum(str: string): number {
 // ── Screen ───────────────────────────────────────────────────────────────────
 
 export default function FormScreen() {
-  const { areaId, type, itemId } = useLocalSearchParams<{
+  const { areaId, type, itemId, readingId } = useLocalSearchParams<{
     areaId: string;
     type: MonitoringType;
     itemId: string;
+    readingId?: string;
   }>();
-  const { items, addReading, getReadingsByItem, getLastReadingByItem } = useApp();
+  const { items, readings, addReading, updateReading, getReadingsByItem, getLastReadingByItem } = useApp();
   const navigation = useNavigation();
 
+  const isEditing = !!readingId;
   const item = useMemo(() => items.find((i) => i.id === itemId), [items, itemId]);
   const fields = useMemo(() => (item ? getFieldConfigs(item) : []), [item]);
+
+  const existingReading = useMemo(
+    () => (readingId ? readings.find((r) => r.id === readingId) ?? null : null),
+    [readingId, readings]
+  );
+
   const lastReading = useMemo(
     () => (itemId ? getLastReadingByItem(itemId) : null),
     [itemId, getLastReadingByItem]
   );
-  const lastLeitura = lastReading?.values.leitura ?? null;
+
+  // For add: bound is the overall last reading.
+  // For edit: bound is the reading chronologically before the one being edited.
+  const leituraLowerBound = useMemo((): number | null => {
+    if (item?.type !== 'hidrometro') return null;
+    if (!isEditing) return lastReading?.values.leitura ?? null;
+    const sorted = getReadingsByItem(itemId!)
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const idx = sorted.findIndex((r) => r.id === readingId);
+    return idx > 0 ? (sorted[idx - 1].values.leitura ?? null) : null;
+  }, [item, isEditing, lastReading, readingId, itemId, getReadingsByItem]);
 
   const [date, setDate] = useState(new Date());
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
@@ -106,15 +130,29 @@ export default function FormScreen() {
   const [observacoes, setObservacoes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Pre-fill form when editing
+  useEffect(() => {
+    if (existingReading) {
+      setDate(parseDateString(existingReading.date));
+      const strValues: Record<string, string> = {};
+      for (const [k, v] of Object.entries(existingReading.values)) {
+        strValues[k] = String(v);
+      }
+      setFieldValues(strValues);
+      setObservacoes(existingReading.observacoes ?? '');
+    }
+  }, [existingReading]);
+
   useEffect(() => {
     navigation.setOptions({
+      title: isEditing ? 'Editar leitura' : 'Nova leitura',
       headerRight: () => (
         <Pressable onPress={handleSave} hitSlop={12}>
           <Text style={[Typography.headline, { color: Colors.black }]}>Salvar</Text>
         </Pressable>
       ),
     });
-  }, [date, fieldValues, observacoes]);
+  }, [date, fieldValues, observacoes, isEditing]);
 
   // ── Live preview ────────────────────────────────────────────────────────────
 
@@ -147,11 +185,11 @@ export default function FormScreen() {
       }
     }
 
-    // Hidrômetro: new reading must be ≥ last reading
-    if (item?.type === 'hidrometro' && lastLeitura !== null) {
+    // Hidrômetro: must be ≥ previous reading in chronological order
+    if (item?.type === 'hidrometro' && leituraLowerBound !== null) {
       const nova = parseNum(fieldValues.leitura ?? '');
-      if (!isNaN(nova) && nova < lastLeitura) {
-        errors.leitura = `Deve ser ≥ ${lastLeitura.toLocaleString('pt-BR')} m³ (última leitura)`;
+      if (!isNaN(nova) && nova < leituraLowerBound) {
+        errors.leitura = `Deve ser ≥ ${leituraLowerBound.toLocaleString('pt-BR')} m³ (última leitura)`;
       }
     }
 
@@ -165,19 +203,20 @@ export default function FormScreen() {
     if (!validate()) return;
 
     const dateStr = toDateString(date);
-    const existingReadings = getReadingsByItem(itemId!);
-    const duplicate = existingReadings.find((r) => r.date === dateStr);
 
-    if (duplicate) {
-      Alert.alert(
-        'Leitura duplicada',
-        `Já existe uma leitura para ${formatDisplayDate(date)}. Deseja substituir?`,
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Salvar mesmo assim', onPress: () => doSave(dateStr) },
-        ]
-      );
-      return;
+    if (!isEditing) {
+      const duplicate = getReadingsByItem(itemId!).find((r) => r.date === dateStr);
+      if (duplicate) {
+        Alert.alert(
+          'Leitura duplicada',
+          `Já existe uma leitura para ${formatDisplayDate(date)}. Deseja substituir?`,
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Salvar mesmo assim', onPress: () => doSave(dateStr) },
+          ]
+        );
+        return;
+      }
     }
 
     await doSave(dateStr);
@@ -189,12 +228,22 @@ export default function FormScreen() {
     for (const field of fields) {
       values[field.key] = parseNum(fieldValues[field.key] ?? '0');
     }
-    await addReading({
-      itemId: itemId!,
-      date: dateStr,
-      values,
-      observacoes: observacoes.trim() || undefined,
-    });
+
+    if (isEditing && readingId) {
+      await updateReading(readingId, {
+        date: dateStr,
+        values,
+        observacoes: observacoes.trim() || undefined,
+      });
+    } else {
+      await addReading({
+        itemId: itemId!,
+        date: dateStr,
+        values,
+        observacoes: observacoes.trim() || undefined,
+      });
+    }
+
     setIsSaving(false);
     router.back();
   };
@@ -225,7 +274,16 @@ export default function FormScreen() {
         {/* Date */}
         <View style={styles.section}>
           <Text style={[Typography.caption, styles.sectionLabel]}>DATA</Text>
-          {Platform.OS === 'ios' ? (
+          {isEditing ? (
+            <View style={styles.lockedDateBox}>
+              <Text style={[Typography.body, { color: Colors.black }]}>
+                {formatDisplayDate(date)}
+              </Text>
+              <Text style={[Typography.caption, { color: Colors.gray400, marginTop: 2 }]}>
+                Data não pode ser alterada
+              </Text>
+            </View>
+          ) : Platform.OS === 'ios' ? (
             <DateTimePicker
               value={date}
               mode="date"
@@ -298,11 +356,12 @@ export default function FormScreen() {
             ))
           )}
 
-          {/* Hidrômetro: last reading hint */}
-          {item?.type === 'hidrometro' && lastLeitura !== null && (
+          {/* Hidrômetro: lower-bound hint */}
+          {item?.type === 'hidrometro' && leituraLowerBound !== null && (
             <View style={styles.hintBox}>
               <Text style={[Typography.caption, { color: Colors.gray600 }]}>
-                Última leitura: {lastLeitura.toLocaleString('pt-BR')} m³
+                {isEditing ? 'Leitura anterior:' : 'Última leitura:'}{' '}
+                {leituraLowerBound.toLocaleString('pt-BR')} m³
               </Text>
             </View>
           )}
@@ -332,7 +391,7 @@ export default function FormScreen() {
         </View>
 
         <Button
-          label={isSaving ? 'Salvando…' : 'Salvar leitura'}
+          label={isSaving ? 'Salvando…' : isEditing ? 'Salvar alterações' : 'Salvar leitura'}
           onPress={handleSave}
           loading={isSaving}
           style={styles.saveButton}
@@ -367,6 +426,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm + 2,
+  },
+  lockedDateBox: {
+    borderWidth: 1.5,
+    borderColor: Colors.gray200,
+    borderRadius: 10,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
+    backgroundColor: Colors.gray50,
   },
   tamborRow: {
     flexDirection: 'row',
