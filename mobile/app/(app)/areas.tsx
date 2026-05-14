@@ -1,5 +1,6 @@
+import NetInfo from '@react-native-community/netinfo';
 import { router } from 'expo-router';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,9 +15,29 @@ function formatDate(dateStr: string): string {
   return `${day}/${month}/${year}`;
 }
 
+function ConnectivityBadge({ isOnline }: { isOnline: boolean | null }) {
+  if (isOnline === null) return null;
+  return (
+    <View style={[styles.badge, isOnline ? styles.badgeOnline : styles.badgeOffline]}>
+      <View style={[styles.badgeDot, { backgroundColor: isOnline ? '#22C55E' : '#EF4444' }]} />
+      <Text style={[Typography.caption, { color: isOnline ? '#15803D' : '#B91C1C', fontWeight: '600' }]}>
+        {isOnline ? 'Online' : 'Offline'}
+      </Text>
+    </View>
+  );
+}
+
 export default function AreasScreen() {
   const { user, logout, areas, getLastReadingByArea } = useApp();
   const insets = useSafeAreaInsets();
+  const [isOnline, setIsOnline] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      setIsOnline(state.isConnected ?? false);
+    });
+    return unsubscribe;
+  }, []);
 
   const areasWithLastReading = useMemo(
     () =>
@@ -59,11 +80,14 @@ export default function AreasScreen() {
           <Text style={[Typography.footnote, { color: Colors.gray500 }]}>Olá,</Text>
           <Text style={[Typography.title1, { color: Colors.black }]}>{user?.name ?? 'Usuário'}</Text>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.avatar} activeOpacity={0.7}>
-          <Text style={[Typography.headline, { color: Colors.white }]}>
-            {(user?.name ?? 'T').charAt(0).toUpperCase()}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <ConnectivityBadge isOnline={isOnline} />
+          <TouchableOpacity onPress={handleLogout} style={styles.avatar} activeOpacity={0.7}>
+            <Text style={[Typography.headline, { color: Colors.white }]}>
+              {(user?.name ?? 'T').charAt(0).toUpperCase()}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Text style={[Typography.callout, { color: Colors.gray500, paddingHorizontal: Spacing.lg, marginBottom: Spacing.md }]}>
@@ -93,6 +117,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.lg,
     marginBottom: Spacing.xs,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: Spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  badgeOnline: {
+    backgroundColor: '#F0FDF4',
+  },
+  badgeOffline: {
+    backgroundColor: '#FEF2F2',
+  },
+  badgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   avatar: {
     width: 44,
