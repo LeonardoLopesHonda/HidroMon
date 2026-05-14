@@ -55,7 +55,7 @@ A field data-capture app for **Vetria Mineração S.A.** to replace manual sprea
 | M-13 | `diasSemLeitura` excludes Sundays; returns `null` for weekly-cadence areas | ✅ | |
 | M-14 | `updateReading` operation in AppContext (full edit, marks `isDirty: true`) | ✅ | |
 | M-15 | `getPrimaryKey(item)` replaces static `PRIMARY_VALUE_KEY` — córrego régua uses `nivel`, tambor uses derived avg | ✅ | Implemented in AppContext; drives stats correctly per item type |
-| M-16 | Monthly cap display: `limiteOutorgado × horasOperacao × daysInMonth` | 🔲 | StatsCard currently shows raw `limiteOutorgado`; needs derived cap |
+| M-16 | Monthly cap display: `limiteOutorgado × horasOperacao × daysInMonth` | ✅ | `monthlyCap` added to `ReadingStats`; StatsCard shows "Cap. mensal" tile; overLimit check uses cap |
 | M-17 | Discriminated union for `MonitoredItem` by type | 🔲 | `limiteOutorgado` is vacuous on pluviômetro/córrego — structural smell in CONTEXT.md |
 
 ### UI / screens
@@ -63,10 +63,12 @@ A field data-capture app for **Vetria Mineração S.A.** to replace manual sprea
 | # | Item | Status | Notes |
 |---|------|--------|-------|
 | M-18 | Form customization per monitoring type (spec: `docs/superpowers/specs/2026-05-13-form-customization-design.md`) | ✅ | Hidrômetro validation + last-reading hint; régua + tambor forms; live flow previews (display-only) |
-| M-19 | Reading list item shows sync status badge (dirty vs synced) | 🔲 | `isDirty` flag exists; no UI indicator yet |
-| M-20 | Edit reading flow: form pre-populated from existing reading, calls `updateReading` | 🔲 | Form is add-only today; tap on a reading in list → open form in edit mode |
+| M-19 | Reading list item shows sync status badge (dirty vs synced) | ✅ | Amber dot below date when `isDirty`; disappears once synced |
+| M-20 | Edit reading flow: form pre-populated from existing reading, calls `updateReading` | ✅ | Tap reading → form opens with `readingId` param; pre-fills all fields; calls `updateReading` on save |
 | M-21 | Delete reading | 🔲 | Not defined yet — decide if needed before backend |
 | M-22 | Safe area insets on all `headerShown: false` screens | ✅ | `auth.tsx` was using hardcoded `paddingTop: 80`; replaced with `useSafeAreaInsets()` — required by `edgeToEdgeEnabled: true` on Android |
+| M-26 | Connectivity badge on Areas screen | ✅ | Colored pill ("Online"/"Offline") in header next to avatar; subscribes to `NetInfo` for live updates |
+| M-27 | Manual sync button on Areas screen | 🔲 | Tap triggers push of all dirty readings to backend; disabled when offline; shows spinner while syncing; blocked on B-1 |
 | M-23 | Top border separator on authenticated Stack screens | ✅ | `headerShadowVisible: false` left no visual boundary between nav header and content; added `borderTopWidth: 1 / gray100` to `contentStyle` in app layout — applies to all screens from area detail through form |
 
 ### Branding / Assets
@@ -117,8 +119,10 @@ These are blocked on backend being live.
 
 UI polish is complete (M-22 – M-25). Remaining mobile items before backend work:
 
-1. **M-16** — Monthly cap display in StatsCard (`limiteOutorgado × horasOperacao × daysInMonth`)
-2. **M-20** — Edit reading flow (tap reading in list → open form pre-populated, calls `updateReading`)
-3. **M-19** — Sync status badge on ReadingListItem (`isDirty` flag exists, no UI yet)
+Mobile is now feature-complete for the demo. Remaining items:
 
-After these, **B-1** (FastAPI scaffold) becomes the next milestone.
+1. **M-21** — Delete reading (decide if needed before backend)
+2. **M-17** — Discriminated union for `MonitoredItem` (structural cleanup)
+3. **M-27** — Manual sync button (blocked on B-1)
+
+Next milestone: **B-1** (FastAPI scaffold), which unblocks M-27 and the S-series.

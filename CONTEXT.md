@@ -48,7 +48,9 @@ Key fields per outorga:
 - **`limiteOutorgado`** — maximum flow rate in m³/h
 - **`horasOperacao`** — authorized operating hours per day (currently 20h for artesian wells / poços tubulares, 24h for surface captures / captações superficiais)
 
-Derived monthly cap = `limiteOutorgado × horasOperacao × daysInMonth`
+Derived monthly cap = `limiteOutorgado × horasOperacao × 30`
+
+The outorga document explicitly fixes the month at **30 days** ("30 dias/mês"), regardless of actual calendar days. The app always uses 30 — not `daysInMonth` — so the cap matches the permit exactly.
 
 > **Design note:** `horasOperacao` is not yet tracked in the app. It defaults to 24h for all items. This must be added to `MonitoredItem` when meters capable of tracking operating hours are deployed. The data model should accommodate this without a breaking change.
 
@@ -69,6 +71,8 @@ Córrego monitoring is located in the decommissioned former work site. It is not
 ### Reading Corrections
 
 The operator can fully edit a past reading after saving it (same form, pre-populated). Mistakes happen and must be correctable in the field without waiting for the supervisor. No audit trail is required in v1. `updateReading` is needed alongside `addReading`. The sync strategy must handle updates (not just creates).
+
+**Hidrômetro odometer integrity on edit:** When correcting a hidrômetro reading, the new value must be ≥ the reading immediately before it in chronological order (not the overall last reading, which is the one being edited). This preserves the odometer invariant — readings must be non-decreasing — without blocking legitimate corrections.
 
 ### Stats Display (per MonitoringType)
 
@@ -115,3 +119,5 @@ Reading frequency is set at the **Área level**, not per item:
 **Implication for `diasSemLeitura`:** The current calculation (`daysInMonth − daysWithReading`) is wrong for both cases:
 - Active site: Sundays must be excluded from expected reading days
 - Decommissioned site: the expected count is weeks, not days — `diasSemLeitura` as a metric does not apply
+
+**Design decision:** `diasSemLeitura` is driven by `Area.frequency`, not by `MonitoringType`. A `null` value (shown as `—`) means the área uses weekly cadence. This is intentional — if cadence ever changes, the stat follows automatically without touching the type layer.

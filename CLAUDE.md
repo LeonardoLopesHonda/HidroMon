@@ -64,3 +64,7 @@ FastAPI + Python — not yet scaffolded. See `docs/adr/0001-offline-first-sync.m
 ## Testing
 
 No test infrastructure is currently configured.
+
+## Git Conventions
+
+- **Never add `Co-Authored-By` lines to commit messages.** Commits are authored by the developer only.
