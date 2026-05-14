@@ -21,7 +21,7 @@ export default function AppLayout() {
         headerTintColor: Colors.black,
         headerStyle: { backgroundColor: Colors.white },
         headerTitleStyle: { color: Colors.black, fontWeight: '700' },
-        contentStyle: { backgroundColor: Colors.white },
+        contentStyle: { backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: Colors.gray100 },
       }}
     >
       <Stack.Screen name="areas" options={{ headerShown: false }} />
