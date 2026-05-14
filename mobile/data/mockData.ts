@@ -18,11 +18,11 @@ export const MOCK_AREAS: Area[] = [
 
 export const MOCK_ITEMS: MonitoredItem[] = [
   // Monjolinho — Hidrômetros (5 items, daily)
-  { id: 'mon-h1', areaId: 'monjolinho', name: 'Capitação - Out3892 - DURH2450',         type: 'hidrometro', limiteOutorgado: 3000, horasOperacao: 24, unit: 'm³' },
-  { id: 'mon-h2', areaId: 'monjolinho', name: 'Pavisan 02 - Out3895 - DURH19146',       type: 'hidrometro', limiteOutorgado: 2500, horasOperacao: 24, unit: 'm³' },
-  { id: 'mon-h3', areaId: 'monjolinho', name: 'Poço 1 Viveiro - Out4085 - DURH20484',   type: 'hidrometro', limiteOutorgado: 1800, horasOperacao: 20, unit: 'm³' },
-  { id: 'mon-h4', areaId: 'monjolinho', name: 'Poço 2 Captação - Out4085 - DURH20485', type: 'hidrometro', limiteOutorgado: 1800, horasOperacao: 20, unit: 'm³' },
-  { id: 'mon-h5', areaId: 'monjolinho', name: 'Poço 4 Novo - Out4085 - DURH20487',     type: 'hidrometro', limiteOutorgado: 1800, horasOperacao: 20, unit: 'm³' },
+  { id: 'mon-h1', areaId: 'monjolinho', name: 'Captação - Out3892 - DURH2450',          type: 'hidrometro', limiteOutorgado: 22.36, horasOperacao: 24, unit: 'm³' },
+  { id: 'mon-h2', areaId: 'monjolinho', name: 'Pavisan 02 - Out3895 - DURH19146',       type: 'hidrometro', limiteOutorgado: 65,    horasOperacao: 24, unit: 'm³' },
+  { id: 'mon-h3', areaId: 'monjolinho', name: 'Poço 1 Viveiro - Out4085 - DURH20484',   type: 'hidrometro', limiteOutorgado: 21.79, horasOperacao: 20, unit: 'm³' },
+  { id: 'mon-h4', areaId: 'monjolinho', name: 'Poço 2 Captação - Out4085 - DURH20485', type: 'hidrometro', limiteOutorgado: 41.89, horasOperacao: 20, unit: 'm³' },
+  { id: 'mon-h5', areaId: 'monjolinho', name: 'Poço 4 Novo - Out4085 - DURH20487',     type: 'hidrometro', limiteOutorgado: 16.6,  horasOperacao: 20, unit: 'm³' },
   // Monjolinho — Pluviômetro (1 item, daily)
   { id: 'mon-p1', areaId: 'monjolinho', name: 'Pluviômetro Mina Monjolinho', type: 'pluviometro', limiteOutorgado: 0, horasOperacao: 24, unit: 'mm' },
   // Laís (decommissioned) — Pluviômetros (3 items, weekly)
@@ -30,9 +30,9 @@ export const MOCK_ITEMS: MonitoredItem[] = [
   { id: 'lais-p2', areaId: 'lais', name: 'Colúvio Sul PRAD',   type: 'pluviometro', limiteOutorgado: 0, horasOperacao: 24, unit: 'mm' },
   { id: 'lais-p3', areaId: 'lais', name: 'Mirante',            type: 'pluviometro', limiteOutorgado: 0, horasOperacao: 24, unit: 'mm' },
   // Laís (decommissioned) — Córregos (2 régua + 1 tambor, weekly)
-  { id: 'lais-c1', areaId: 'lais', name: 'Córrego das Pedras',  type: 'corrego', corregoMethod: 'regua',  limiteOutorgado: 0, horasOperacao: 24, unit: 'm³/s' },
-  { id: 'lais-c2', areaId: 'lais', name: 'Baia Sul',            type: 'corrego', corregoMethod: 'regua',  limiteOutorgado: 0, horasOperacao: 24, unit: 'm³/s' },
-  { id: 'lais-c3', areaId: 'lais', name: 'Córrego Arigolândia', type: 'corrego', corregoMethod: 'tambor', limiteOutorgado: 0, horasOperacao: 24, unit: 'L/s' },
+  { id: 'lais-c1', areaId: 'lais', name: 'Córrego das Pedras',  type: 'corrego', corregoMethod: 'regua',  limiteOutorgado: 0, horasOperacao: 24, unit: 'm' },
+  { id: 'lais-c2', areaId: 'lais', name: 'Baia Sul',            type: 'corrego', corregoMethod: 'regua',  limiteOutorgado: 0, horasOperacao: 24, unit: 'm' },
+  { id: 'lais-c3', areaId: 'lais', name: 'Córrego Arigolândia', type: 'corrego', corregoMethod: 'tambor', limiteOutorgado: 0, horasOperacao: 24, unit: 's' },
 ];
 
 function addDays(dateStr: string, days: number): string {
