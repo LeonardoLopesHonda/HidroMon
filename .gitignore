@@ -46,3 +46,11 @@ yarn-error.*
 .metro-health-check*
 .env*.local
 logs
+
+# ── Skilss ─────────────────────────────────────────────────────
+.agents/
+skills-lock.json
+
+# ── Agent handoff docs (local, ephemeral) ─────────────────────
+handoffs/
+handoff-*.md
