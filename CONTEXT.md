@@ -18,8 +18,12 @@ These are confirmed bugs and missing model fields discovered during domain analy
 |---|---|---|---|
 | `Area` | `frequency` | `'daily' \| 'weekly'` | Determines expected reading cadence and `diasSemLeitura` calculation |
 | `MonitoredItem` | `horasOperacao` | `number` | Authorized operating hours/day. Default 24. Will vary (20h for artesian wells) when tracked |
-| `Reading` | `isDirty` | `boolean` | True until synced to backend |
-| `Reading` | `syncedAt` | `string \| null` | ISO timestamp set by server on successful push; null if unsynced |
+| `Reading` | `recordedAt` | `string` | ISO timestamp set by mobile at first save, frozen on edit. See ADR 0005. |
+| `Reading` | `createdAt` | `string` | ISO timestamp set by server on insert. Returned in API responses. |
+| `Reading` | `updatedAt` | `string` | ISO timestamp set by server on insert and on edit. Drives `?since=` sync. |
+| `Reading` | `createdBy` | `string` (UUID) | `auth.users.id` of the JWT subject. Server-set on insert. |
+| `Reading` (mobile only) | `isDirty` | `boolean` | True until synced to backend. **Not** persisted in Postgres. |
+| `Reading` (mobile only) | `syncedAt` | `string \| null` | Mobile copies the server's `updatedAt` here after a successful sync. **Not** persisted in Postgres. |
 
 ### Missing Operations
 
@@ -103,7 +107,7 @@ The supervisor's review, compliance analysis, and reporting happen in a separate
 - Conflict resolution strategy: always one operator per Área (lean crew), so last-write-wins on sync is sufficient — no multi-device concurrency
 
 ### Reading (Leitura)
-A measurement captured on a specific date for a MonitoredItem. A Reading records the measured values and an optional observation note.
+A measurement captured on a specific date for a MonitoredItem. A Reading records the measured values and an optional observation note. Readings are **edit-only** — they can be corrected (PUT) but never deleted. The single-writer invariant (one device per Área registers readings) means soft-delete tombstones are unnecessary; see ADR 0006.
 
 **Hidrômetro readings are cumulative** — the value recorded is the odometer counter on the physical meter (e.g., 1042 m³), not the consumption since the last visit. Monthly consumption must therefore be derived as `lastReading − firstReading` (or last reading of month − last reading of previous month), not as a sum of readings. The current `getStats` code incorrectly sums readings — this is a known bug.
 
@@ -121,3 +125,16 @@ Reading frequency is set at the **Área level**, not per item:
 - Decommissioned site: the expected count is weeks, not days — `diasSemLeitura` as a metric does not apply
 
 **Design decision:** `diasSemLeitura` is driven by `Area.frequency`, not by `MonitoringType`. A `null` value (shown as `—`) means the área uses weekly cadence. This is intentional — if cadence ever changes, the stat follows automatically without touching the type layer.
+
+### Sync & Identity
+
+Decisions formalised in ADR 0006:
+
+- **IDs** are **client-generated UUIDv4** for all sync-relevant entities (`areas`, `monitored_items`, `readings`). The device assigns the ID at the moment of creation — even offline — and the server accepts it as-is. Idempotent inserts (`ON CONFLICT DO NOTHING`) make retries safe.
+- **Three operator/server clocks** on each `Reading` (see ADR 0005): `date` (calendar day measured), `recordedAt` (when the operator was at the meter — frozen at first save), `updatedAt` (server-side last-changed marker driving `?since=` sync).
+- **`?since=` is the sync contract.** First install passes `since=1970-01-01` (or omits) for a full pull; subsequent pulls track `lastSyncedAt = max(updatedAt)` locally. No pagination.
+- **`isDirty` and `syncedAt` are mobile-only.** They describe the AsyncStorage cache's relationship to the server, not properties of a reading. They never appear in Postgres or in API responses.
+- **`createdBy`** on `Reading` carries the JWT subject (`auth.users.id`). Three accounts exist: shared crew account (used by both 3rd-party operators), project owner, supervisor. Most rows carry the crew UUID; rows created by owner/supervisor are distinguishable in queries.
+- **No `profiles` table.** Operator identity is not modelled inside the app — `auth.users` alone is enough. Operator names go in `observacoes` when relevant.
+- **Edit-only.** No DELETE endpoint, no `deleted_at` column. Mistakes are corrected by PUT.
+- **Auth.** Supabase email + password, invite-only. FastAPI is a resource server that verifies JWTs; it never sees passwords.
