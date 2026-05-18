@@ -25,18 +25,18 @@ Adopt the following stack and structure:
   │   │   ├── api.py
   │   │   └── routes/              # one file per resource
   │   ├── core/
-  │   │   ├── config.py            # Pydantic Settings
-  │   │   └── supabase.py          # Supabase client singleton
+  │   │   └── config.py            # Pydantic Settings
   │   ├── db/
   │   │   └── database.py          # engine + session + ALL ORM classes
   │   ├── models/                  # Pydantic schemas (one file per resource)
   │   └── services/                # business logic (one file per resource)
   ├── tests/                       # API/integration tests (sibling of app/)
-  ├── supabase/
-  │   └── migrations/              # SQL migrations — source of truth
   ├── pyproject.toml
   ├── uv.lock
   └── .env.example
+
+  supabase/                        # repo root — managed by Supabase CLI
+  └── migrations/                  # SQL migrations — source of truth
   ```
 
 - **Layering rule:** routes (thin) → services (business logic, takes `db: Session`) → ORM. Pydantic crosses HTTP boundary; ORM never leaves the service.
