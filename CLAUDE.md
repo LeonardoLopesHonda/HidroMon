@@ -67,7 +67,9 @@ No test infrastructure is currently configured.
 
 ## Git Conventions
 
-- **Never add `Co-Authored-By` lines to commit messages.** Commits are authored by the developer only.
+- **No descriptions.** Commit messages are a single subject line only — no body, no extended explanation.
+- **No co-authorship lines.** Never add `Co-Authored-By` or any attribution trailer. Commits are authored by the developer only.
+- **Modular commits.** Each commit covers one logical change. Don't bundle unrelated edits; don't split a single change across multiple commits.
 
 ## Agent skills
 
