@@ -68,3 +68,17 @@ No test infrastructure is currently configured.
 ## Git Conventions
 
 - **Never add `Co-Authored-By` lines to commit messages.** Commits are authored by the developer only.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues (`LeonardoLopesHonda/monitoramento-ambiental-telos`), managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context repo — one `CONTEXT.md` + `docs/adr/` at the root. See `docs/agents/domain.md`.
