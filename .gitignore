@@ -15,9 +15,9 @@ mobile/*.tsbuildinfo
 mobile/app-example/
 
 # ── Backend (FastAPI / Python) ─────────────────────────────────
-backend/__pycache__/
-backend/*.pyc
-backend/*.pyo
+__pycache__/
+*.pyc
+*.pyo
 backend/.venv/
 backend/venv/
 backend/.env
@@ -25,6 +25,9 @@ backend/.env.*
 backend/*.egg-info/
 backend/dist/
 backend/.pytest_cache/
+
+# ── Supabase (local Studio scratch) ───────────────────────────
+supabase/snippets/
 
 # ── Root-level artifacts (from pre-monorepo structure) ────────
 node_modules/
