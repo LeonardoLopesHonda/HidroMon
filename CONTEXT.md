@@ -72,11 +72,27 @@ The category of a MonitoredItem. Three types exist with distinct purposes:
 
 Córrego monitoring is located in the decommissioned former work site. It is not operationally linked to active water use on the main Área.
 
+### Reading Derivations (Córrego)
+
+`vazao` (m³/s) is **never recorded by the operator** — the server computes it from the raw inputs the operator captures, and stores both raw + derived. Constants are hardcoded in the backend service layer (single weir, single bucket; revisit if either varies).
+
+| Method | Operator captures | Server computes |
+|---|---|---|
+| **Régua** | `nivel` (water height, meters) | `vazao = 1.8 × 0.6 × nivel^1.5` (sharp-crested rectangular weir, C=1.8, crest L=0.6 m) |
+| **Tambor** | `t1, t2, t3` (3 fill-time samples, seconds, same 200 L bucket) | `vazao = 0.2 / avg(t1, t2, t3)` |
+
+**Tambor sampling rule:** all three fill times must be > 0. Partial measurements (only one or two times captured) are rejected — both mobile and server. The same bucket is timed three times by process; missing samples mean the observation is incomplete, not tolerable.
+
 ### Reading Corrections
 
 The operator can fully edit a past reading after saving it (same form, pre-populated). Mistakes happen and must be correctable in the field without waiting for the supervisor. No audit trail is required in v1. `updateReading` is needed alongside `addReading`. The sync strategy must handle updates (not just creates).
 
-**Hidrômetro odometer integrity on edit:** When correcting a hidrômetro reading, the new value must be ≥ the reading immediately before it in chronological order (not the overall last reading, which is the one being edited). This preserves the odometer invariant — readings must be non-decreasing — without blocking legitimate corrections.
+**Hidrômetro odometer integrity:** Hidrômetro readings must be non-decreasing in chronological order. Enforced on both create and edit, mobile and server:
+
+- **Create (POST):** new `valor` must be ≥ the chronologically last reading on the same item.
+- **Edit (PUT):** new `valor` must be ≥ the reading immediately *before* this one in chronological order (not the overall last reading, which is the one being edited).
+
+Mobile blocks save inline with the error "Valor menor que leitura anterior: X m³". Server returns 422 as authoritative backstop. Applies only to `type='hidrometro'` items.
 
 ### Stats Display (per MonitoringType)
 
@@ -137,4 +153,13 @@ Decisions formalised in ADR 0006:
 - **`createdBy`** on `Reading` carries the JWT subject (`auth.users.id`). Three accounts exist: shared crew account (used by both 3rd-party operators), project owner, supervisor. Most rows carry the crew UUID; rows created by owner/supervisor are distinguishable in queries.
 - **No `profiles` table.** Operator identity is not modelled inside the app — `auth.users` alone is enough. Operator names go in `observacoes` when relevant.
 - **Edit-only.** No DELETE endpoint, no `deleted_at` column. Mistakes are corrected by PUT.
-- **Auth.** Supabase email + password, invite-only. FastAPI is a resource server that verifies JWTs; it never sees passwords.
+- **Auth.** Supabase email + password, invite-only. FastAPI is a resource server that verifies JWTs (ES256 via JWKS); it never sees passwords. Mobile uses `@supabase/supabase-js` with the default AsyncStorage session adapter.
+
+### Sync Triggers and Logout
+
+Sync engine details are formalised in ADR 0007. The behaviours operators see:
+
+- **Auto-sync** fires on (1) NetInfo connectivity restore and (2) app foreground re-entry. No periodic polling, no background fetch.
+- **Manual sync button** lives on the Áreas screen header — a spinning icon while syncing, a dirty-count badge when > 0 readings await push, a "Última sync: X min atrás" subtitle.
+- **Logout wipes everything**: AsyncStorage cache (`areas`, `items`, `readings`, cursor) + Supabase session. If dirty readings exist at logout, the app blocks with a confirmation: "X leituras não sincronizadas serão perdidas — sair mesmo assim?". Shared device handoff between the three accounts (crew / owner / supervisor) makes wipe the safe default.
+- **First-run requires internet**: master data (`areas`, `items`) blocks the UI behind a "Sincronizando dados iniciais…" screen; reading history streams in the background. There is no mock seed fallback — `mockData.ts` was removed when the SQL seed migration landed.
