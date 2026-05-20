@@ -52,15 +52,53 @@ PUT  /readings/{id}
 
 ### Reading value columns
 
-Typed nullable numeric columns, not JSONB:
+Typed nullable numeric columns + one JSONB sidecar for raw samples:
 
 - `valor NUMERIC(12,3)` — hidrômetro (m³ cumulative) and pluviômetro (mm).
-- `nivel NUMERIC(8,2)` — córrego water level (cm).
-- `vazao NUMERIC(10,4)` — córrego flow rate (m³/s).
+- `nivel NUMERIC(6,3)` — córrego water level in **meters** (régua only).
+- `vazao NUMERIC(10,4)` — córrego flow rate (m³/s). **Server-derived on insert** — never accepted from the client.
+- `raw_values JSONB NULL` — tambor fill-time samples only (`{t1, t2, t3}` in seconds). NULL for all other types.
 
-Aggregates (`AVG`, `SUM`, `MAX`) are the hot path for stats; typed columns keep that SQL simple. The Pydantic schema still exposes a nested `values: { ... }` object on the wire — translation happens in the service layer to preserve the mobile app's existing shape.
+Aggregates (`AVG`, `SUM`, `MAX`) are the hot path for stats; typed columns keep that SQL simple. JSONB is reserved for the one item-type (tambor) that captures multiple raw inputs that aren't themselves the stored measurement.
+
+### Wire `values` shape
+
+The API exposes a single flat `values` object that carries every possible field:
+
+```jsonc
+{
+  "values": {
+    "valor": 1042.5,   // hidrômetro / pluviômetro
+    "nivel": 0.215,    // régua (meters)
+    "vazao": 0.108,    // córrego — server-set on response; ignored if present in request
+    "t1": 44.2,        // tambor only
+    "t2": 45.1,        // tambor only
+    "t3": 43.8         // tambor only
+  }
+}
+```
+
+The service layer splits these into typed columns vs `raw_values` on insert, and re-assembles them on response. Mobile sends raw inputs (`nivel` for régua, `t1/t2/t3` for tambor); server computes `vazao` and returns it.
+
+### Server-side derivations
+
+Computed on insert from raw inputs and stored alongside them. Constants live in the service layer (hardcoded; see ADR 0007 for the rationale):
+
+- **Régua** — `vazao = 1.8 * 0.6 * nivel^1.5` (sharp-crested rectangular weir, C=1.8, L=0.6 m). When `nivel = 0` or NULL, `vazao = NULL`.
+- **Tambor** — `vazao = 0.2 / avg(t1, t2, t3)` (200 L bucket = 0.2 m³). Requires all three samples > 0; partial measurements are rejected.
+
+Raw inputs are preserved (`nivel` column, `raw_values` JSONB) so derived values can be recomputed if a constant ever changes (new weir geometry, different bucket).
 
 A CHECK constraint enforcing "the right column is populated for each item type" is desirable but requires denormalising `type` onto `readings` (CHECK constraints cannot cross tables). Deferred: enforce in the service layer for v1, revisit if drift becomes a real bug.
+
+### Hidrômetro odometer invariant
+
+Enforced on both `POST /readings` and `PUT /readings/{id}`:
+
+- **POST** — `valor` must be ≥ the chronologically last reading on the same `item_id` (latest `date`, tiebreak `recorded_at`).
+- **PUT** — `valor` must be ≥ the reading immediately before this one in chronological order (not the overall last reading, which is the row being edited).
+
+The check applies only to `type='hidrometro'` items. Mobile validates the same rule client-side for inline UX; server is the authoritative backstop.
 
 ## Alternatives considered
 
