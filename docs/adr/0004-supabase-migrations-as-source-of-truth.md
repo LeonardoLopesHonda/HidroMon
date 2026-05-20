@@ -30,4 +30,4 @@ Local Supabase stack (`supabase start`) runs Postgres + Studio + Auth in Docker 
 - Schema changes are written twice: once in SQL, once mirrored in the ORM. This is deliberate — the duplication forces the operator to read and understand the SQL, which is the actual contract.
 - Drift between SQL and ORM is a real risk. A schema-drift test (e.g., reflect DB metadata at test startup and diff against `Base.metadata`) is worth adding before the model grows past a handful of tables.
 - RLS policies, CHECK constraints, and seed data live in migrations — they are part of the schema, not afterthoughts.
-- The mobile app's `mockData.ts` will be ported into the first migration as the v1 seed.
+- The mobile app's `mockData.ts` is ported into a separate seed migration (`20260520_seed_master_data.sql`) — master data only (`areas` + `monitored_items`). Reading history is not seeded; real history starts from real readings. After porting, `mockData.ts` is deleted from the mobile codebase to remove any risk of fixture data reaching prod via accidental code paths.
