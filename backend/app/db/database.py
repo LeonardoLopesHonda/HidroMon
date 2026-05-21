@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, create_engine
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from app.core.config import settings
@@ -56,8 +56,9 @@ class Reading(Base):
     date: Mapped[date] = mapped_column(Date)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     valor: Mapped[float | None] = mapped_column(Numeric(12, 3))
-    nivel: Mapped[float | None] = mapped_column(Numeric(8, 2))
+    nivel: Mapped[float | None] = mapped_column(Numeric(6, 3))
     vazao: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    raw_values: Mapped[dict | None] = mapped_column(JSONB)
     observacoes: Mapped[str | None] = mapped_column(String)
     created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
