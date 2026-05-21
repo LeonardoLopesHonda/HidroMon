@@ -13,6 +13,9 @@ mobile/ios/
 mobile/android/
 mobile/*.tsbuildinfo
 mobile/app-example/
+mobile/.env
+mobile/.env.*
+!mobile/.env.example
 
 # ── Backend (FastAPI / Python) ─────────────────────────────────
 __pycache__/
