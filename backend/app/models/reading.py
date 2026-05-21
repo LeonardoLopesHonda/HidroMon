@@ -9,6 +9,9 @@ class ReadingValues(BaseModel):
     valor: float | None = None
     nivel: float | None = None
     vazao: float | None = None
+    t1: float | None = None
+    t2: float | None = None
+    t3: float | None = None
 
 
 class ReadingCreate(BaseModel):
