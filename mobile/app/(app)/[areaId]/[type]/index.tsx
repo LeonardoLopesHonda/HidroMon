@@ -5,7 +5,7 @@ import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Card } from '@/components/ui/Card';
 import { useApp } from '@/context/AppContext';
 import { Colors, Spacing, Typography } from '@/constants/theme';
-import { MonitoredItem, MonitoringType } from '@/types';
+import { MonitoredItem, MonitoringType, ReadingValues } from '@/types';
 
 const TYPE_LABELS: Record<MonitoringType, string> = {
   hidrometro: 'Hidrômetros',
@@ -13,10 +13,10 @@ const TYPE_LABELS: Record<MonitoringType, string> = {
   corrego: 'Córregos',
 };
 
-const VALUE_LABELS: Record<MonitoringType, (values: Record<string, number>) => string> = {
-  hidrometro: (v) => `${v.leitura ?? '—'} m³`,
-  pluviometro: (v) => `${v.precipitacao ?? '—'} mm`,
-  corrego: (v) => `${v.nivel ?? '—'} cm  ·  ${v.vazao ?? '—'} m³/s`,
+const VALUE_LABELS: Record<MonitoringType, (values: ReadingValues) => string> = {
+  hidrometro: (v) => `${v.valor ?? '—'} m³`,
+  pluviometro: (v) => `${v.valor ?? '—'} mm`,
+  corrego: (v) => `${v.nivel ?? '—'} m  ·  ${v.vazao ?? '—'} m³/s`,
 };
 
 function formatDate(dateStr: string): string {

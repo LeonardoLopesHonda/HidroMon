@@ -1,33 +1,51 @@
+import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
-import { MOCK_AREAS, MOCK_ITEMS, MOCK_READINGS } from '@/data/mockData';
+import { apiClient } from '@/lib/api/client';
+import { supabase } from '@/lib/supabase';
+import { pullAreas, pullItems, pullReadings } from '@/lib/sync/pull';
+import { pushDirty } from '@/lib/sync/push';
 import { Area, MonitoredItem, MonitoringType, Reading, ReadingStats, User } from '@/types';
 
+type SyncStatus = 'idle' | 'syncing' | 'error';
+
+function mergeById<T extends { id: string }>(local: T[], server: T[]): T[] {
+  const map = new Map<string, T>(local.map((x) => [x.id, x]));
+  for (const s of server) map.set(s.id, s);
+  return Array.from(map.values());
+}
+
+function mergeReadings(local: Reading[], server: Reading[]): Reading[] {
+  const map = new Map<string, Reading>(local.map((r) => [r.id, r]));
+  for (const s of server) {
+    const existing = map.get(s.id);
+    // Single-writer invariant: keep local edits in-flight; server otherwise wins.
+    if (existing?.isDirty) continue;
+    map.set(s.id, { ...s, isDirty: false, syncedAt: s.updatedAt ?? null });
+  }
+  return Array.from(map.values());
+}
+
+function maxUpdatedAt(rows: { updatedAt?: string }[]): string | null {
+  let max: string | null = null;
+  for (const r of rows) {
+    if (r.updatedAt && (!max || r.updatedAt > max)) max = r.updatedAt;
+  }
+  return max;
+}
+
 const STORAGE_KEYS = {
-  user: '@telos_user',
   areas: '@telos_areas',
   items: '@telos_items',
   readings: '@telos_readings',
+  lastSyncedAt: '@telos_lastSyncedAt',
 } as const;
-
-const MOCK_CREDENTIALS: Record<string, User> = {
-  telos: { username: 'telos', name: 'Telos' },
-};
-const MOCK_PASSWORDS: Record<string, string> = {
-  telos: 'telos2024',
-};
 
 function getPrimaryKey(item: MonitoredItem): string {
   if (item.type === 'corrego') return item.corregoMethod === 'tambor' ? 'avg' : 'nivel';
-  return item.type === 'hidrometro' ? 'leitura' : 'precipitacao';
-}
-
-function generateId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
-  });
+  return 'valor';
 }
 
 function getDaysInMonth(year: number, month: number): number {
@@ -45,7 +63,7 @@ function countWorkdaysInMonth(year: number, month: number): number {
 
 interface AppContextValue {
   user: User | null;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   isAuthLoading: boolean;
 
@@ -53,6 +71,16 @@ interface AppContextValue {
   items: MonitoredItem[];
   readings: Reading[];
   isDataLoading: boolean;
+
+  sync: () => Promise<void>;
+  syncStatus: SyncStatus;
+  lastSyncedAt: string | null;
+  syncError: string | null;
+  dirtyCount: number;
+  isBootstrapping: boolean;
+  bootstrapError: string | null;
+  readingsLoading: boolean;
+  retryBootstrap: () => void;
 
   addReading: (reading: Omit<Reading, 'id' | 'isDirty' | 'syncedAt'>) => Promise<void>;
   updateReading: (id: string, patch: Partial<Omit<Reading, 'id'>>) => Promise<void>;
@@ -75,87 +103,143 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
 
-  // Auth check on mount (fast, separate from data load)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const syncInFlight = useRef(false);
+
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [readingsLoading, setReadingsLoading] = useState(false);
+  const [bootstrapNonce, setBootstrapNonce] = useState(0);
+
+  // Auth: hydrate from supabase-js session, subscribe to changes.
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEYS.user).then((raw) => {
-      if (raw) setUser(JSON.parse(raw));
+    supabase.auth.getSession().then(({ data }) => {
+      const s = data.session;
+      setUser(s?.user ? { id: s.user.id, email: s.user.email ?? '' } : null);
       setIsAuthLoading(false);
     });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ? { id: session.user.id, email: session.user.email ?? '' } : null);
+    });
+    return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Data load on mount
+  // Data load on user change. First login (no cache) blocks on master data, streams readings.
   useEffect(() => {
+    if (!user) {
+      setIsDataLoading(false);
+      return;
+    }
+    let cancelled = false;
+
     const load = async () => {
       const pairs = await AsyncStorage.multiGet([
         STORAGE_KEYS.areas,
         STORAGE_KEYS.items,
         STORAGE_KEYS.readings,
+        STORAGE_KEYS.lastSyncedAt,
       ]);
+      if (cancelled) return;
 
       const rawAreas = pairs[0][1];
       const rawItems = pairs[1][1];
       const rawReadings = pairs[2][1];
+      const rawCursor = pairs[3][1];
+      if (rawCursor) setLastSyncedAt(rawCursor);
 
-      if (rawAreas && rawItems && rawReadings) {
-        // Migrate stored data to ensure new fields exist (backward compat with old AsyncStorage)
-        type RawArea = { id: string; name: string; frequency?: 'daily' | 'weekly' };
-        type RawItem = MonitoredItem & { horasOperacao?: number };
-        type RawReading = Reading & { isDirty?: boolean; syncedAt?: string | null };
-
-        const parsedAreas: Area[] = (JSON.parse(rawAreas) as RawArea[]).map((a) => ({
-          id: a.id,
-          name: a.name,
-          frequency: a.frequency ?? 'daily',
-        }));
-        const parsedItems: MonitoredItem[] = (JSON.parse(rawItems) as RawItem[]).map((i) => ({
-          ...i,
-          horasOperacao: i.horasOperacao ?? 24,
-        }));
-        const parsedReadings: Reading[] = (JSON.parse(rawReadings) as RawReading[]).map((r) => ({
-          ...r,
-          isDirty: r.isDirty ?? false,
-          syncedAt: r.syncedAt ?? null,
-        }));
-        setAreas(parsedAreas);
-        setItems(parsedItems);
-        setReadings(parsedReadings);
-      } else {
-        // First run: seed with mock data
-        await AsyncStorage.multiSet([
-          [STORAGE_KEYS.areas, JSON.stringify(MOCK_AREAS)],
-          [STORAGE_KEYS.items, JSON.stringify(MOCK_ITEMS)],
-          [STORAGE_KEYS.readings, JSON.stringify(MOCK_READINGS)],
-        ]);
-        setAreas(MOCK_AREAS);
-        setItems(MOCK_ITEMS);
-        setReadings(MOCK_READINGS);
+      if (rawAreas && rawItems) {
+        setAreas(JSON.parse(rawAreas));
+        setItems(JSON.parse(rawItems));
+        setReadings(rawReadings ? JSON.parse(rawReadings) : []);
+        setIsDataLoading(false);
+        return;
       }
-      setIsDataLoading(false);
+
+      // First login — bootstrap: pull master data synchronously, stream readings.
+      setIsBootstrapping(true);
+      setBootstrapError(null);
+      try {
+        const [serverAreas, serverItems] = await Promise.all([
+          pullAreas(apiClient, null),
+          pullItems(apiClient, null),
+        ]);
+        if (cancelled) return;
+        setAreas(serverAreas);
+        setItems(serverItems);
+        await AsyncStorage.multiSet([
+          [STORAGE_KEYS.areas, JSON.stringify(serverAreas)],
+          [STORAGE_KEYS.items, JSON.stringify(serverItems)],
+        ]);
+        setIsBootstrapping(false);
+        setIsDataLoading(false);
+
+        setReadingsLoading(true);
+        pullReadings(apiClient, null)
+          .then(async (serverReadings) => {
+            if (cancelled) return;
+            const merged = serverReadings.map((r) => ({
+              ...r,
+              isDirty: false,
+              syncedAt: r.updatedAt ?? null,
+            }));
+            setReadings(merged);
+            const newCursor = maxUpdatedAt([...serverAreas, ...serverItems, ...merged]);
+            const writes: [string, string][] = [
+              [STORAGE_KEYS.readings, JSON.stringify(merged)],
+            ];
+            if (newCursor) writes.push([STORAGE_KEYS.lastSyncedAt, newCursor]);
+            await AsyncStorage.multiSet(writes);
+            if (newCursor) setLastSyncedAt(newCursor);
+          })
+          .catch(() => {
+            // Readings stream failure is non-fatal — surface via syncError on next manual sync.
+          })
+          .finally(() => {
+            if (!cancelled) setReadingsLoading(false);
+          });
+      } catch (e) {
+        if (cancelled) return;
+        setBootstrapError(e instanceof Error ? e.message : 'Erro ao carregar dados iniciais');
+        setIsBootstrapping(false);
+        setIsDataLoading(false);
+      }
     };
     load();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [user, bootstrapNonce]);
 
-  const login = useCallback(async (username: string, password: string): Promise<boolean> => {
-    const u = username.toLowerCase().trim();
-    if (MOCK_PASSWORDS[u] === password) {
-      const userData = MOCK_CREDENTIALS[u];
-      await AsyncStorage.setItem(STORAGE_KEYS.user, JSON.stringify(userData));
-      setUser(userData);
-      return true;
-    }
-    return false;
+  const retryBootstrap = useCallback(() => setBootstrapNonce((n) => n + 1), []);
+
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    return !error;
   }, []);
 
   const logout = useCallback(async () => {
-    await AsyncStorage.removeItem(STORAGE_KEYS.user);
-    setUser(null);
+    await supabase.auth.signOut();
+    await AsyncStorage.multiRemove([
+      STORAGE_KEYS.areas,
+      STORAGE_KEYS.items,
+      STORAGE_KEYS.readings,
+      STORAGE_KEYS.lastSyncedAt,
+    ]);
+    setAreas([]);
+    setItems([]);
+    setReadings([]);
   }, []);
 
   const addReading = useCallback(
     async (reading: Omit<Reading, 'id' | 'isDirty' | 'syncedAt'>) => {
       const newReading: Reading = {
         ...reading,
-        id: generateId(),
+        id: crypto.randomUUID(),
         isDirty: true,
         syncedAt: null,
       };
@@ -168,14 +252,111 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateReading = useCallback(
     async (id: string, patch: Partial<Omit<Reading, 'id'>>) => {
+      // Preserve syncedAt on edit — it routes a PUT (vs POST for new rows).
+      // Only flip isDirty: true. Date is frozen per ADR 0005; we don't touch it.
       const updated = readings.map((r) =>
-        r.id === id ? { ...r, ...patch, isDirty: true, syncedAt: null } : r
+        r.id === id ? { ...r, ...patch, isDirty: true } : r
       );
       setReadings(updated);
       await AsyncStorage.setItem(STORAGE_KEYS.readings, JSON.stringify(updated));
     },
     [readings]
   );
+
+  const sync = useCallback(async () => {
+    if (syncInFlight.current) return;
+    syncInFlight.current = true;
+    setSyncStatus('syncing');
+    setSyncError(null);
+    try {
+      // 1. Push dirty readings first.
+      const dirty = readings.filter((r) => r.isDirty);
+      const pushResult =
+        dirty.length > 0
+          ? await pushDirty(apiClient, dirty)
+          : { succeeded: [], failed: [] };
+
+      const successMap = new Map(pushResult.succeeded.map((s) => [s.id, s.updatedAt]));
+      const cleanedReadings = readings.map((r) => {
+        const updatedAt = successMap.get(r.id);
+        return updatedAt
+          ? { ...r, isDirty: false, syncedAt: updatedAt, updatedAt }
+          : r;
+      });
+
+      // 2. Pull deltas since the global cursor.
+      const [serverAreas, serverItems, serverReadings] = await Promise.all([
+        pullAreas(apiClient, lastSyncedAt),
+        pullItems(apiClient, lastSyncedAt),
+        pullReadings(apiClient, lastSyncedAt),
+      ]);
+
+      const mergedAreas = mergeById(areas, serverAreas);
+      const mergedItems = mergeById(items, serverItems);
+      const mergedReadings = mergeReadings(cleanedReadings, serverReadings);
+
+      const newCursor =
+        maxUpdatedAt([...mergedAreas, ...mergedItems, ...mergedReadings]) ?? lastSyncedAt;
+
+      setAreas(mergedAreas);
+      setItems(mergedItems);
+      setReadings(mergedReadings);
+      if (newCursor) setLastSyncedAt(newCursor);
+
+      const writes: [string, string][] = [
+        [STORAGE_KEYS.areas, JSON.stringify(mergedAreas)],
+        [STORAGE_KEYS.items, JSON.stringify(mergedItems)],
+        [STORAGE_KEYS.readings, JSON.stringify(mergedReadings)],
+      ];
+      if (newCursor) writes.push([STORAGE_KEYS.lastSyncedAt, newCursor]);
+      await AsyncStorage.multiSet(writes);
+
+      if (pushResult.failed.length > 0) {
+        setSyncStatus('error');
+        setSyncError(`${pushResult.failed.length} leitura(s) falharam ao enviar`);
+      } else {
+        setSyncStatus('idle');
+      }
+    } catch (e) {
+      setSyncStatus('error');
+      setSyncError(e instanceof Error ? e.message : 'Erro de sincronização');
+    } finally {
+      syncInFlight.current = false;
+    }
+  }, [areas, items, readings, lastSyncedAt]);
+
+  const dirtyCount = useMemo(() => readings.filter((r) => r.isDirty).length, [readings]);
+
+  // Auto-sync triggers (ADR 0007): NetInfo offline→online, AppState foreground re-entry.
+  // Debounce: skip if a trigger fired within DEBOUNCE_MS.
+  const lastTriggerAt = useRef(0);
+  const DEBOUNCE_MS = 2000;
+  const triggerSync = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTriggerAt.current < DEBOUNCE_MS) return;
+    lastTriggerAt.current = now;
+    void sync();
+  }, [sync]);
+
+  useEffect(() => {
+    if (!user || isDataLoading) return;
+
+    let wasOnline: boolean | null = null;
+    const netSub = NetInfo.addEventListener((state) => {
+      const online = !!(state.isConnected && state.isInternetReachable !== false);
+      if (wasOnline === false && online) triggerSync();
+      wasOnline = online;
+    });
+
+    const appSub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') triggerSync();
+    });
+
+    return () => {
+      netSub();
+      appSub.remove();
+    };
+  }, [user, isDataLoading, triggerSync]);
 
   const getItemsByAreaAndType = useCallback(
     (areaId: string, type: MonitoringType) =>
@@ -229,8 +410,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const { t1 = 0, t2 = 0, t3 = 0 } = r.values;
           return t1 > 0 && t2 > 0 && t3 > 0 ? (t1 + t2 + t3) / 3 : 0;
         }
-        const key = type === 'hidrometro' ? 'leitura' : type === 'pluviometro' ? 'precipitacao' : 'nivel';
-        return r.values[key] ?? 0;
+        if (type === 'corrego') return r.values.nivel ?? 0;
+        return r.values.valor ?? 0;
       });
 
       let total = 0;
@@ -282,6 +463,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       items,
       readings,
       isDataLoading,
+      sync,
+      syncStatus,
+      lastSyncedAt,
+      syncError,
+      dirtyCount,
+      isBootstrapping,
+      bootstrapError,
+      readingsLoading,
+      retryBootstrap,
       addReading,
       updateReading,
       getItemsByAreaAndType,
@@ -293,6 +483,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [
       user, login, logout, isAuthLoading,
       areas, items, readings, isDataLoading,
+      sync, syncStatus, lastSyncedAt, syncError, dirtyCount,
+      isBootstrapping, bootstrapError, readingsLoading, retryBootstrap,
       addReading, updateReading, getItemsByAreaAndType, getReadingsByItem,
       getLastReadingByItem, getLastReadingByArea, getStats,
     ]

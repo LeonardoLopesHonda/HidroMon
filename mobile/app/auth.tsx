@@ -22,9 +22,9 @@ import { Colors, Spacing, Typography } from '@/constants/theme';
 export default function AuthScreen() {
   const { login } = useApp();
   const insets = useSafeAreaInsets();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [usernameError, setUsernameError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -42,11 +42,14 @@ export default function AuthScreen() {
 
   const validate = () => {
     let valid = true;
-    if (!username.trim()) {
-      setUsernameError('Informe o usuário');
+    if (!email.trim()) {
+      setEmailError('Informe o email');
+      valid = false;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setEmailError('Email inválido');
       valid = false;
     } else {
-      setUsernameError('');
+      setEmailError('');
     }
     if (!password) {
       setPasswordError('Informe a senha');
@@ -60,12 +63,12 @@ export default function AuthScreen() {
   const handleSubmit = async () => {
     if (!validate()) return;
     setIsSubmitting(true);
-    const ok = await login(username, password);
+    const ok = await login(email, password);
     setIsSubmitting(false);
     if (ok) {
       router.replace('/(app)/areas' as never);
     } else {
-      setPasswordError('Usuário ou senha incorretos');
+      setPasswordError('Email ou senha incorretos');
       shake();
     }
   };
@@ -95,16 +98,17 @@ export default function AuthScreen() {
 
         <Animated.View style={[styles.form, { transform: [{ translateX: shakeX }] }]}>
           <AppTextInput
-            label="Usuário"
+            label="Email"
             variant="underline"
-            value={username}
-            onChangeText={setUsername}
+            value={email}
+            onChangeText={setEmail}
             autoCapitalize="none"
             autoCorrect={false}
+            keyboardType="email-address"
             returnKeyType="next"
             onSubmitEditing={() => passwordRef.current?.focus()}
             blurOnSubmit={false}
-            error={usernameError}
+            error={emailError}
           />
           <AppTextInput
             ref={passwordRef}

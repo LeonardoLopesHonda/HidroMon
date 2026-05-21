@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Spacing, Typography } from '@/constants/theme';
-import { MonitoredItem, MonitoringType, Reading } from '@/types';
+import { MonitoredItem, MonitoringType, Reading, ReadingValues } from '@/types';
 
 interface Props {
   reading: Reading;
@@ -16,7 +16,7 @@ function formatDate(dateStr: string): string {
   return `${day}/${month}/${year}`;
 }
 
-function tamborAvgLs(values: Record<string, number>): { avg: string; ls: string } | null {
+function tamborAvgLs(values: ReadingValues): { avg: string; ls: string } | null {
   const { t1, t2, t3 } = values;
   if (!t1 || !t2 || !t3) return null;
   const avg = (t1 + t2 + t3) / 3;
@@ -66,8 +66,8 @@ export function ReadingListItem({ reading, type, corregoMethod, onPress }: Props
         ) : (
           <Text style={[Typography.headline, { color: Colors.black }]}>
             {type === 'hidrometro'
-              ? `${reading.values.leitura ?? '—'} m³`
-              : `${reading.values.precipitacao ?? '—'} mm`}
+              ? `${reading.values.valor ?? '—'} m³`
+              : `${reading.values.valor ?? '—'} mm`}
           </Text>
         )}
         {reading.observacoes ? (

@@ -16,7 +16,7 @@ import { AppTextInput } from '@/components/ui/AppTextInput';
 import { Button } from '@/components/ui/Button';
 import { useApp } from '@/context/AppContext';
 import { Colors, Spacing, Typography } from '@/constants/theme';
-import { MonitoredItem, MonitoringType } from '@/types';
+import { MonitoredItem, MonitoringType, ReadingValues } from '@/types';
 
 // ── Field config ────────────────────────────────────────────────────────────
 
@@ -29,9 +29,9 @@ interface FieldConfig {
 function getFieldConfigs(item: MonitoredItem): FieldConfig[] {
   switch (item.type) {
     case 'hidrometro':
-      return [{ key: 'leitura', label: 'Leitura (m³)', placeholder: '0.0' }];
+      return [{ key: 'valor', label: 'Leitura (m³)', placeholder: '0.0' }];
     case 'pluviometro':
-      return [{ key: 'precipitacao', label: 'Precipitação (mm)', placeholder: '0.0' }];
+      return [{ key: 'valor', label: 'Precipitação (mm)', placeholder: '0.0' }];
     case 'corrego':
       if (item.corregoMethod === 'tambor') {
         return [
@@ -115,12 +115,12 @@ export default function FormScreen() {
   // For edit: bound is the reading chronologically before the one being edited.
   const leituraLowerBound = useMemo((): number | null => {
     if (item?.type !== 'hidrometro') return null;
-    if (!isEditing) return lastReading?.values.leitura ?? null;
+    if (!isEditing) return lastReading?.values.valor ?? null;
     const sorted = getReadingsByItem(itemId!)
       .slice()
       .sort((a, b) => a.date.localeCompare(b.date));
     const idx = sorted.findIndex((r) => r.id === readingId);
-    return idx > 0 ? (sorted[idx - 1].values.leitura ?? null) : null;
+    return idx > 0 ? (sorted[idx - 1].values.valor ?? null) : null;
   }, [item, isEditing, lastReading, readingId, itemId, getReadingsByItem]);
 
   const [date, setDate] = useState(new Date());
@@ -172,6 +172,7 @@ export default function FormScreen() {
 
   const validate = (): boolean => {
     const errors: Record<string, string> = {};
+    const isTamborItem = item?.corregoMethod === 'tambor';
 
     for (const field of fields) {
       const raw = fieldValues[field.key] ?? '';
@@ -181,15 +182,18 @@ export default function FormScreen() {
         const num = parseNum(raw);
         if (isNaN(num) || num < 0) {
           errors[field.key] = 'Informe um número válido';
+        } else if (isTamborItem && num <= 0) {
+          // Tambor 3-sample rule: every fill time must be > 0 (matches server 422).
+          errors[field.key] = 'Tempo deve ser maior que zero';
         }
       }
     }
 
-    // Hidrômetro: must be ≥ previous reading in chronological order
+    // Hidrômetro odometer invariant (ADR 0006): non-decreasing in chronological order.
     if (item?.type === 'hidrometro' && leituraLowerBound !== null) {
-      const nova = parseNum(fieldValues.leitura ?? '');
+      const nova = parseNum(fieldValues.valor ?? '');
       if (!isNaN(nova) && nova < leituraLowerBound) {
-        errors.leitura = `Deve ser ≥ ${leituraLowerBound.toLocaleString('pt-BR')} m³ (última leitura)`;
+        errors.valor = `Valor menor que leitura anterior: ${leituraLowerBound.toLocaleString('pt-BR')} m³`;
       }
     }
 
@@ -224,14 +228,13 @@ export default function FormScreen() {
 
   const doSave = async (dateStr: string) => {
     setIsSaving(true);
-    const values: Record<string, number> = {};
+    const values: ReadingValues = {};
     for (const field of fields) {
-      values[field.key] = parseNum(fieldValues[field.key] ?? '0');
+      (values as Record<string, number>)[field.key] = parseNum(fieldValues[field.key] ?? '0');
     }
 
     if (isEditing && readingId) {
       await updateReading(readingId, {
-        date: dateStr,
         values,
         observacoes: observacoes.trim() || undefined,
       });
@@ -239,6 +242,7 @@ export default function FormScreen() {
       await addReading({
         itemId: itemId!,
         date: dateStr,
+        recordedAt: new Date().toISOString(),
         values,
         observacoes: observacoes.trim() || undefined,
       });

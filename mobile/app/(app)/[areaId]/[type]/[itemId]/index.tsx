@@ -18,7 +18,7 @@ export default function ItemDetailScreen() {
     type: MonitoringType;
     itemId: string;
   }>();
-  const { items, getReadingsByItem, getStats } = useApp();
+  const { items, getReadingsByItem, getStats, readingsLoading } = useApp();
   const navigation = useNavigation();
 
   const [selectedMonth, setSelectedMonth] = useState({
@@ -81,7 +81,7 @@ export default function ItemDetailScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={[Typography.body, { color: Colors.gray400 }]}>
-              Nenhuma leitura neste mês
+              {readingsLoading ? 'Histórico carregando…' : 'Nenhuma leitura neste mês'}
             </Text>
           </View>
         }

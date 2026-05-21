@@ -4,6 +4,8 @@ export interface Area {
   id: string;
   name: string;
   frequency: 'daily' | 'weekly';
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface MonitoredItem {
@@ -11,18 +13,34 @@ export interface MonitoredItem {
   areaId: string;
   name: string;
   type: MonitoringType;
-  limiteOutorgado: number;
+  limiteOutorgado: number | null;
   horasOperacao: number; // artesian wells = 20h, surface captures = 24h
-  unit: string;
+  unit: string | null;
   corregoMethod?: 'regua' | 'tambor'; // only set when type === 'corrego'
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ReadingValues {
+  valor?: number;   // hidrômetro (m³ cumulative) / pluviômetro (mm)
+  nivel?: number;   // córrego régua (meters)
+  vazao?: number;   // córrego — server-derived
+  t1?: number;      // córrego tambor (seconds)
+  t2?: number;
+  t3?: number;
 }
 
 export interface Reading {
   id: string;
   itemId: string;
   date: string; // YYYY-MM-DD
-  values: Record<string, number>;
+  recordedAt: string; // ISO; frozen at first save (ADR 0005)
+  values: ReadingValues;
   observacoes?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  // mobile-only sync state (never sent to server)
   isDirty: boolean;
   syncedAt: string | null;
 }
@@ -40,6 +58,6 @@ export interface ReadingStats {
 }
 
 export interface User {
-  username: string;
-  name: string;
+  id: string;
+  email: string;
 }
