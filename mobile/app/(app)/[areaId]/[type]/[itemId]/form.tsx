@@ -228,28 +228,40 @@ export default function FormScreen() {
 
   const doSave = async (dateStr: string) => {
     setIsSaving(true);
-    const values: ReadingValues = {};
-    for (const field of fields) {
-      (values as Record<string, number>)[field.key] = parseNum(fieldValues[field.key] ?? '0');
-    }
+    try {
+      const values: ReadingValues = {};
+      for (const field of fields) {
+        (values as Record<string, number>)[field.key] = parseNum(fieldValues[field.key] ?? '0');
+      }
 
-    if (isEditing && readingId) {
-      await updateReading(readingId, {
-        values,
-        observacoes: observacoes.trim() || undefined,
-      });
-    } else {
-      await addReading({
-        itemId: itemId!,
-        date: dateStr,
-        recordedAt: new Date().toISOString(),
-        values,
-        observacoes: observacoes.trim() || undefined,
-      });
+      if (isEditing && readingId) {
+        await updateReading(readingId, {
+          values,
+          observacoes: observacoes.trim() || undefined,
+        });
+      } else {
+        await addReading({
+          itemId: itemId!,
+          date: dateStr,
+          recordedAt: new Date().toISOString(),
+          values,
+          observacoes: observacoes.trim() || undefined,
+        });
+      }
+      router.back();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      Alert.alert(
+        'Não foi possível salvar',
+        `A leitura não foi registrada. ${message}`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Tentar novamente', onPress: () => doSave(dateStr) },
+        ]
+      );
+    } finally {
+      setIsSaving(false);
     }
-
-    setIsSaving(false);
-    router.back();
   };
 
   const handleDateChange = (_: unknown, selected?: Date) => {

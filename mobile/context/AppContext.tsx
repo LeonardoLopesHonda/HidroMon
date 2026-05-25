@@ -1,5 +1,6 @@
 import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
@@ -239,7 +240,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     async (reading: Omit<Reading, 'id' | 'isDirty' | 'syncedAt'>) => {
       const newReading: Reading = {
         ...reading,
-        id: crypto.randomUUID(),
+        id: Crypto.randomUUID(),
         isDirty: true,
         syncedAt: null,
       };
