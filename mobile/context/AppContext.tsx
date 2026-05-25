@@ -359,6 +359,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user, isDataLoading, triggerSync]);
 
+  // Push-on-dirty: any local mutation that leaves rows dirty kicks a sync.
+  // Also catches pending rows left over from a previous session at startup.
+  useEffect(() => {
+    if (!user || isDataLoading) return;
+    if (dirtyCount === 0) return;
+    triggerSync();
+  }, [dirtyCount, user, isDataLoading, triggerSync]);
+
   const getItemsByAreaAndType = useCallback(
     (areaId: string, type: MonitoringType) =>
       items.filter((i) => i.areaId === areaId && i.type === type),
