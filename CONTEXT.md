@@ -58,8 +58,16 @@ The outorga document explicitly fixes the month at **30 days** ("30 dias/mês"),
 
 > **Design note:** `horasOperacao` is not yet tracked in the app. It defaults to 24h for all items. This must be added to `MonitoredItem` when meters capable of tracking operating hours are deployed. The data model should accommodate this without a breaking change.
 
+### Horímetro
+An hour-meter: a cumulative counter on a hidrômetro's pump/motor that records the total number of hours it has operated. Read off the physical device exactly like the m³ odometer — a monotonically non-decreasing sequence of numbers. Only some hidrômetros carry one (a horímetro-equipped meter was installed in place of an older meter that had none).
+
+The horímetro is a **captured value on each Reading**, recorded by the operator alongside the m³ counter during the same visit — not a permit constant. It is distinct from **`horasOperacao`** (the outorga's *authorized* operating hours/day, a fixed assumption used in the monthly cap). One is measured, the other is permitted.
+
 ### MonitoredItem (Item Monitorado)
-A physical measurement point within an Área. Each item belongs to one Área and has one MonitoringType. Only hidrômetros carry a meaningful `limiteOutorgado`; pluviômetros and córregos have no permit-based consumption cap.
+A physical measurement point within an Área. Each item belongs to one Área and has one MonitoringType. Only hidrômetros carry a meaningful `limiteOutorgado`; pluviômetros and córregos have no permit-based consumption cap. A hidrômetro may additionally be **horímetro-equipped** — see [Horímetro](#horímetro) — in which case each reading also captures the hour counter.
+
+### Disabled Item
+A MonitoredItem can be **disabled** (retired) when the physical device is decommissioned — typically when a meter is replaced by a newer one. A disabled item **no longer accepts new readings**, but its history is preserved and remains fully visible; past readings can still be corrected. Disabling is about stopping new activity, not freezing the record. The replacement is modelled as a *separate* MonitoredItem, so each physical device keeps its own uninterrupted reading history.
 
 ### MonitoringType
 The category of a MonitoredItem. Three types exist with distinct purposes:
@@ -105,6 +113,7 @@ The item detail screen shows stats to help the operator be proactively aware —
 | Média | Not meaningful (cumulative values) | Average daily precipitation | Average level / flow |
 | Máximo / Mínimo | Not meaningful | Max/min precipitation day | Max/min level / flow |
 | Dias sem leitura | Working days in month (excl. Sundays) minus days with readings | Same | Not applicable (weekly cadence) |
+| Horas operadas | `lastHorímetro − firstHorímetro` of month — only for horímetro-equipped hidrômetros; does **not** feed the cap | — | — |
 
 No automated alerts are required in v1. High consumption awareness is informal.
 
