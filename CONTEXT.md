@@ -61,7 +61,9 @@ The outorga document explicitly fixes the month at **30 days** ("30 dias/mês"),
 ### Horímetro
 An hour-meter: a cumulative counter on a hidrômetro's pump/motor that records the total number of hours it has operated. Read off the physical device exactly like the m³ odometer — a monotonically non-decreasing sequence of numbers. Only some hidrômetros carry one (a horímetro-equipped meter was installed in place of an older meter that had none).
 
-The horímetro is a **captured value on each Reading**, recorded by the operator alongside the m³ counter during the same visit — not a permit constant. It is distinct from **`horasOperacao`** (the outorga's *authorized* operating hours/day, a fixed assumption used in the monthly cap). One is measured, the other is permitted.
+The horímetro is an **optional value on a Reading**, distinct from **`horasOperacao`** (the outorga's *authorized* operating hours/day, a fixed assumption used in the monthly cap). One is measured, the other is permitted.
+
+**The hours are not read on-site.** The field operator has no gauge to read the horímetro from — the hours data lives in a separate third-party app the operator cannot access. So a monitoring Reading is saved with the m³ value and the horímetro left **blank**, and the hours are **backfilled later** (via the normal edit flow) by whoever has the third-party data. Horímetro values are therefore *sparse* — present on some readings, absent on others — and entered *out of chronological order*.
 
 ### MonitoredItem (Item Monitorado)
 A physical measurement point within an Área. Each item belongs to one Área and has one MonitoringType. Only hidrômetros carry a meaningful `limiteOutorgado`; pluviômetros and córregos have no permit-based consumption cap. A hidrômetro may additionally be **horímetro-equipped** — see [Horímetro](#horímetro) — in which case each reading also captures the hour counter.
