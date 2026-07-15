@@ -83,6 +83,12 @@ def update_reading(
     return _to_response(reading)
 
 
+def delete_reading(db: Session, reading_id: uuid.UUID) -> None:
+    """Hard delete. Idempotent — a missing row is treated as already deleted."""
+    db.query(Reading).filter(Reading.id == reading_id).delete()
+    db.commit()
+
+
 def _fetch_item(db: Session, item_id: uuid.UUID) -> MonitoredItem:
     item = db.query(MonitoredItem).filter(MonitoredItem.id == item_id).first()
     if not item:
