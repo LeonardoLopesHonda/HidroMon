@@ -8,6 +8,7 @@ interface Props {
   reading: Reading;
   type: MonitoringType;
   corregoMethod?: MonitoredItem['corregoMethod'];
+  hasHorimetro?: boolean;
   onPress?: () => void;
 }
 
@@ -32,7 +33,7 @@ function ValueRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ReadingListItem({ reading, type, corregoMethod, onPress }: Props) {
+export function ReadingListItem({ reading, type, corregoMethod, hasHorimetro, onPress }: Props) {
   return (
     <Pressable
       style={({ pressed }) => [styles.row, pressed && onPress && styles.rowPressed]}
@@ -73,6 +74,11 @@ export function ReadingListItem({ reading, type, corregoMethod, onPress }: Props
             {type === 'hidrometro' && reading.values.horimetro != null && (
               <Text style={[Typography.caption, { color: Colors.gray500, marginTop: 2 }]}>
                 {reading.values.horimetro} h
+              </Text>
+            )}
+            {type === 'hidrometro' && hasHorimetro && reading.values.horimetro == null && (
+              <Text style={[Typography.caption, { color: Colors.warning, marginTop: 2 }]}>
+                Horímetro pendente
               </Text>
             )}
           </>
