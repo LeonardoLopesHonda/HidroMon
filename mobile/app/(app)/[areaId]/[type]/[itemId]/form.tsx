@@ -101,7 +101,7 @@ export default function FormScreen() {
     itemId: string;
     readingId?: string;
   }>();
-  const { items, readings, addReading, updateReading, getReadingsByItem, getLastReadingByItem } = useApp();
+  const { items, readings, addReading, updateReading, deleteReading, getReadingsByItem, getLastReadingByItem } = useApp();
   const navigation = useNavigation();
 
   const isEditing = !!readingId;
@@ -310,6 +310,25 @@ export default function FormScreen() {
     }
   };
 
+  const handleDelete = () => {
+    if (!readingId) return;
+    Alert.alert(
+      'Excluir leitura',
+      'Esta ação não pode ser desfeita. Deseja excluir esta leitura?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteReading(readingId);
+            router.back();
+          },
+        },
+      ]
+    );
+  };
+
   const handleDateChange = (_: unknown, selected?: Date) => {
     setShowAndroidPicker(false);
     if (selected) setDate(selected);
@@ -477,6 +496,12 @@ export default function FormScreen() {
           style={styles.saveButton}
         />
         <Button label="Cancelar" variant="ghost" onPress={() => router.back()} />
+
+        {isEditing && (
+          <Pressable onPress={handleDelete} style={styles.deleteButton} hitSlop={8}>
+            <Text style={[Typography.headline, { color: Colors.danger }]}>Excluir leitura</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -540,5 +565,10 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginBottom: Spacing.sm,
+  },
+  deleteButton: {
+    height: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
