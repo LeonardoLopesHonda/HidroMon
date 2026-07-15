@@ -20,5 +20,7 @@ class ItemResponse(BaseModel):
     unit: str | None
     horas_operacao: int
     corrego_method: str | None
+    has_horimetro: bool
+    disabled: bool
     created_at: datetime
     updated_at: datetime

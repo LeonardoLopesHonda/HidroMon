@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, create_engine
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, create_engine
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
@@ -44,6 +44,8 @@ class MonitoredItem(Base):
     unit: Mapped[str | None] = mapped_column(String)
     horas_operacao: Mapped[int] = mapped_column(Integer)
     corrego_method: Mapped[str | None] = mapped_column(String)
+    has_horimetro: Mapped[bool] = mapped_column(Boolean)
+    disabled: Mapped[bool] = mapped_column(Boolean)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
@@ -56,6 +58,7 @@ class Reading(Base):
     date: Mapped[date] = mapped_column(Date)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     valor: Mapped[float | None] = mapped_column(Numeric(12, 3))
+    horimetro: Mapped[float | None] = mapped_column(Numeric(12, 3))
     nivel: Mapped[float | None] = mapped_column(Numeric(6, 3))
     vazao: Mapped[float | None] = mapped_column(Numeric(10, 4))
     raw_values: Mapped[dict | None] = mapped_column(JSONB)

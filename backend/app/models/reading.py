@@ -7,6 +7,7 @@ from pydantic.alias_generators import to_camel
 
 class ReadingValues(BaseModel):
     valor: float | None = None
+    horimetro: float | None = None
     nivel: float | None = None
     vazao: float | None = None
     t1: float | None = None
