@@ -134,7 +134,7 @@ The supervisor's review, compliance analysis, and reporting happen in a separate
 - Conflict resolution strategy: always one operator per Área (lean crew), so last-write-wins on sync is sufficient — no multi-device concurrency
 
 ### Reading (Leitura)
-A measurement captured on a specific date for a MonitoredItem. A Reading records the measured values and an optional observation note. Readings are **edit-only** — they can be corrected (PUT) but never deleted. The single-writer invariant (one device per Área registers readings) means soft-delete tombstones are unnecessary; see ADR 0006.
+A measurement captured on a specific date for a MonitoredItem. A Reading records the measured values and an optional observation note. Readings are corrected by editing (PUT). They can also be **hard-deleted** — physically removed — for rows that shouldn't exist at all (full duplicates) or that were logged against the wrong item, which editing can't repair. Deletion is irreversible and leaves no audit trail; see ADR 0008 (which amends ADR 0006's original edit-only stance).
 
 **Hidrômetro readings are cumulative** — the value recorded is the odometer counter on the physical meter (e.g., 1042 m³), not the consumption since the last visit. Monthly consumption must therefore be derived as `lastReading − firstReading` (or last reading of month − last reading of previous month), not as a sum of readings. The current `getStats` code incorrectly sums readings — this is a known bug.
 
@@ -163,7 +163,7 @@ Decisions formalised in ADR 0006:
 - **`isDirty` and `syncedAt` are mobile-only.** They describe the AsyncStorage cache's relationship to the server, not properties of a reading. They never appear in Postgres or in API responses.
 - **`createdBy`** on `Reading` carries the JWT subject (`auth.users.id`). Three accounts exist: shared crew account (used by both 3rd-party operators), project owner, supervisor. Most rows carry the crew UUID; rows created by owner/supervisor are distinguishable in queries.
 - **No `profiles` table.** Operator identity is not modelled inside the app — `auth.users` alone is enough. Operator names go in `observacoes` when relevant.
-- **Edit-only.** No DELETE endpoint, no `deleted_at` column. Mistakes are corrected by PUT.
+- **Edit + hard delete.** Mistakes are corrected by PUT; rows that shouldn't exist are removed via `DELETE /readings/{id}` (idempotent, no `deleted_at`). Mobile queues deletes offline in a pending-delete list and drains it on sync. See ADR 0008.
 - **Auth.** Supabase email + password, invite-only. FastAPI is a resource server that verifies JWTs (ES256 via JWKS); it never sees passwords. Mobile uses `@supabase/supabase-js` with the default AsyncStorage session adapter.
 
 ### Sync Triggers and Logout
