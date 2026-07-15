@@ -28,8 +28,13 @@ interface FieldConfig {
 
 function getFieldConfigs(item: MonitoredItem): FieldConfig[] {
   switch (item.type) {
-    case 'hidrometro':
-      return [{ key: 'valor', label: 'Leitura (m³)', placeholder: '0.0' }];
+    case 'hidrometro': {
+      const configs: FieldConfig[] = [{ key: 'valor', label: 'Leitura (m³)', placeholder: '0.0' }];
+      if (item.hasHorimetro) {
+        configs.push({ key: 'horimetro', label: 'Horímetro (h)', placeholder: '0.0' });
+      }
+      return configs;
+    }
     case 'pluviometro':
       return [{ key: 'valor', label: 'Precipitação (mm)', placeholder: '0.0' }];
     case 'corrego':
@@ -123,6 +128,17 @@ export default function FormScreen() {
     return idx > 0 ? (sorted[idx - 1].values.valor ?? null) : null;
   }, [item, isEditing, lastReading, readingId, itemId, getReadingsByItem]);
 
+  // Horímetro shares the odometer's non-decreasing rule — same prior-reading bound.
+  const horimetroLowerBound = useMemo((): number | null => {
+    if (!item?.hasHorimetro) return null;
+    if (!isEditing) return lastReading?.values.horimetro ?? null;
+    const sorted = getReadingsByItem(itemId!)
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const idx = sorted.findIndex((r) => r.id === readingId);
+    return idx > 0 ? (sorted[idx - 1].values.horimetro ?? null) : null;
+  }, [item, isEditing, lastReading, readingId, itemId, getReadingsByItem]);
+
   const [date, setDate] = useState(new Date());
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
@@ -194,6 +210,14 @@ export default function FormScreen() {
       const nova = parseNum(fieldValues.valor ?? '');
       if (!isNaN(nova) && nova < leituraLowerBound) {
         errors.valor = `Valor menor que leitura anterior: ${leituraLowerBound.toLocaleString('pt-BR')} m³`;
+      }
+    }
+
+    // Horímetro is also a cumulative counter — same non-decreasing rule, own message.
+    if (item?.hasHorimetro && horimetroLowerBound !== null) {
+      const nova = parseNum(fieldValues.horimetro ?? '');
+      if (!isNaN(nova) && nova < horimetroLowerBound) {
+        errors.horimetro = `Horímetro menor que leitura anterior: ${horimetroLowerBound.toLocaleString('pt-BR')} h`;
       }
     }
 
@@ -378,6 +402,16 @@ export default function FormScreen() {
               <Text style={[Typography.caption, { color: Colors.gray600 }]}>
                 {isEditing ? 'Leitura anterior:' : 'Última leitura:'}{' '}
                 {leituraLowerBound.toLocaleString('pt-BR')} m³
+              </Text>
+            </View>
+          )}
+
+          {/* Horímetro: prior-counter hint */}
+          {item?.hasHorimetro && horimetroLowerBound !== null && (
+            <View style={styles.hintBox}>
+              <Text style={[Typography.caption, { color: Colors.gray600 }]}>
+                {isEditing ? 'Horímetro anterior:' : 'Último horímetro:'}{' '}
+                {horimetroLowerBound.toLocaleString('pt-BR')} h
               </Text>
             </View>
           )}

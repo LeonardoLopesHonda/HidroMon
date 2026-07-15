@@ -14,7 +14,8 @@ const TYPE_LABELS: Record<MonitoringType, string> = {
 };
 
 const VALUE_LABELS: Record<MonitoringType, (values: ReadingValues) => string> = {
-  hidrometro: (v) => `${v.valor ?? '—'} m³`,
+  hidrometro: (v) =>
+    `${v.valor ?? '—'} m³${v.horimetro != null ? `  ·  ${v.horimetro} h` : ''}`,
   pluviometro: (v) => `${v.valor ?? '—'} mm`,
   corrego: (v) => `${v.nivel ?? '—'} m  ·  ${v.vazao ?? '—'} m³/s`,
 };
@@ -52,7 +53,18 @@ export default function TypeScreen() {
       >
         <View style={styles.cardContent}>
           <View style={styles.cardLeft}>
-            <Text style={[Typography.headline, { color: Colors.black }]}>{item.name}</Text>
+            <View style={styles.titleRow}>
+              <Text
+                style={[Typography.headline, { color: item.disabled ? Colors.gray400 : Colors.black }]}
+              >
+                {item.name}
+              </Text>
+              {item.disabled && (
+                <View style={styles.disabledBadge}>
+                  <Text style={[Typography.caption, styles.disabledBadgeText]}>Desativado</Text>
+                </View>
+              )}
+            </View>
             {last ? (
               <Text style={[Typography.footnote, { color: Colors.gray500, marginTop: 4 }]}>
                 {VALUE_LABELS[type!]?.(last.values)}  ·  {formatDate(last.date)}
@@ -101,6 +113,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardLeft: { flex: 1 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  disabledBadge: {
+    backgroundColor: Colors.gray100,
+    borderRadius: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+  },
+  disabledBadgeText: {
+    color: Colors.gray500,
+    letterSpacing: 0.3,
+  },
   empty: {
     flex: 1,
     alignItems: 'center',

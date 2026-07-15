@@ -441,6 +441,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         diasSemLeitura = Math.max(0, countWorkdaysInMonth(year, month) - daysWithReading);
       }
 
+      // Horímetro: hours operated this month = last − first counter reading.
+      // Independent of monthlyCap — measured hours never feed the permit cap.
+      let horasOperadas: number | null = null;
+      if (item?.hasHorimetro) {
+        const horas = monthReadings
+          .map((r) => r.values.horimetro)
+          .filter((h): h is number => typeof h === 'number');
+        horasOperadas = horas.length >= 2 ? horas[horas.length - 1] - horas[0] : 0;
+      }
+
       const limiteOutorgado = item?.limiteOutorgado ?? 0;
       const monthlyCap =
         item?.type === 'hidrometro' && limiteOutorgado > 0
@@ -453,6 +463,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         maximo: type === 'hidrometro' ? null : Math.round(maximo * 100) / 100,
         minimo: type === 'hidrometro' ? null : Math.round(minimo * 100) / 100,
         diasSemLeitura,
+        horasOperadas: horasOperadas === null ? null : Math.round(horasOperadas * 100) / 100,
         limiteOutorgado,
         monthlyCap: Math.round(monthlyCap * 100) / 100,
         unit: item?.unit ?? '',

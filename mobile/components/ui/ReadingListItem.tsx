@@ -64,11 +64,18 @@ export function ReadingListItem({ reading, type, corregoMethod, onPress }: Props
             <ValueRow label="Nível" value={`${reading.values.nivel ?? '—'} m`} />
           )
         ) : (
-          <Text style={[Typography.headline, { color: Colors.black }]}>
-            {type === 'hidrometro'
-              ? `${reading.values.valor ?? '—'} m³`
-              : `${reading.values.valor ?? '—'} mm`}
-          </Text>
+          <>
+            <Text style={[Typography.headline, { color: Colors.black }]}>
+              {type === 'hidrometro'
+                ? `${reading.values.valor ?? '—'} m³`
+                : `${reading.values.valor ?? '—'} mm`}
+            </Text>
+            {type === 'hidrometro' && reading.values.horimetro != null && (
+              <Text style={[Typography.caption, { color: Colors.gray500, marginTop: 2 }]}>
+                {reading.values.horimetro} h
+              </Text>
+            )}
+          </>
         )}
         {reading.observacoes ? (
           <Text
