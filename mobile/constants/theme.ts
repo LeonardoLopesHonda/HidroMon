@@ -17,6 +17,7 @@ export const Colors = {
   dangerLight: '#FFF0EE',
   success: '#22C55E',
   successLight: '#F0FDF4',
+  warning: '#B45309',
 } as const;
 
 export const Typography = StyleSheet.create({

@@ -7,7 +7,7 @@ import { AppState } from 'react-native';
 import { apiClient } from '@/lib/api/client';
 import { supabase } from '@/lib/supabase';
 import { pullAreas, pullItems, pullReadings } from '@/lib/sync/pull';
-import { pushDirty } from '@/lib/sync/push';
+import { pushDeletes, pushDirty } from '@/lib/sync/push';
 import { Area, MonitoredItem, MonitoringType, Reading, ReadingStats, User } from '@/types';
 
 type SyncStatus = 'idle' | 'syncing' | 'error';
@@ -42,6 +42,7 @@ const STORAGE_KEYS = {
   items: '@telos_items',
   readings: '@telos_readings',
   lastSyncedAt: '@telos_lastSyncedAt',
+  pendingDeletes: '@telos_pendingDeletes',
 } as const;
 
 function getPrimaryKey(item: MonitoredItem): string {
@@ -85,6 +86,7 @@ interface AppContextValue {
 
   addReading: (reading: Omit<Reading, 'id' | 'isDirty' | 'syncedAt'>) => Promise<void>;
   updateReading: (id: string, patch: Partial<Omit<Reading, 'id'>>) => Promise<void>;
+  deleteReading: (id: string) => Promise<void>;
 
   getItemsByAreaAndType: (areaId: string, type: MonitoringType) => MonitoredItem[];
   getReadingsByItem: (itemId: string) => Reading[];
@@ -102,6 +104,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [areas, setAreas] = useState<Area[]>([]);
   const [items, setItems] = useState<MonitoredItem[]>([]);
   const [readings, setReadings] = useState<Reading[]>([]);
+  const [pendingDeletes, setPendingDeletes] = useState<string[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
@@ -141,6 +144,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         STORAGE_KEYS.items,
         STORAGE_KEYS.readings,
         STORAGE_KEYS.lastSyncedAt,
+        STORAGE_KEYS.pendingDeletes,
       ]);
       if (cancelled) return;
 
@@ -148,7 +152,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const rawItems = pairs[1][1];
       const rawReadings = pairs[2][1];
       const rawCursor = pairs[3][1];
+      const rawPendingDeletes = pairs[4][1];
       if (rawCursor) setLastSyncedAt(rawCursor);
+      if (rawPendingDeletes) setPendingDeletes(JSON.parse(rawPendingDeletes));
 
       if (rawAreas && rawItems) {
         setAreas(JSON.parse(rawAreas));
@@ -230,10 +236,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       STORAGE_KEYS.items,
       STORAGE_KEYS.readings,
       STORAGE_KEYS.lastSyncedAt,
+      STORAGE_KEYS.pendingDeletes,
     ]);
     setAreas([]);
     setItems([]);
     setReadings([]);
+    setPendingDeletes([]);
   }, []);
 
   const addReading = useCallback(
@@ -264,12 +272,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [readings]
   );
 
+  const deleteReading = useCallback(
+    async (id: string) => {
+      const target = readings.find((r) => r.id === id);
+      const updated = readings.filter((r) => r.id !== id);
+      setReadings(updated);
+      const writes: [string, string][] = [
+        [STORAGE_KEYS.readings, JSON.stringify(updated)],
+      ];
+      // Only rows that reached the server need a DELETE; never-synced rows just vanish.
+      if (target && target.syncedAt !== null) {
+        const nextPending = [...pendingDeletes, id];
+        setPendingDeletes(nextPending);
+        writes.push([STORAGE_KEYS.pendingDeletes, JSON.stringify(nextPending)]);
+      }
+      await AsyncStorage.multiSet(writes);
+    },
+    [readings, pendingDeletes]
+  );
+
   const sync = useCallback(async () => {
     if (syncInFlight.current) return;
     syncInFlight.current = true;
     setSyncStatus('syncing');
     setSyncError(null);
     try {
+      // 0. Drain pending hard-deletes. Idempotent server-side; failures stay queued.
+      const deleteResult =
+        pendingDeletes.length > 0
+          ? await pushDeletes(apiClient, pendingDeletes)
+          : { succeeded: [], failed: [] };
+      const remainingDeletes = pendingDeletes.filter(
+        (id) => !deleteResult.succeeded.includes(id)
+      );
+      const deleteSet = new Set(remainingDeletes);
+
       // 1. Push dirty readings first.
       const dirty = readings.filter((r) => r.isDirty);
       const pushResult =
@@ -294,7 +331,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const mergedAreas = mergeById(areas, serverAreas);
       const mergedItems = mergeById(items, serverItems);
-      const mergedReadings = mergeReadings(cleanedReadings, serverReadings);
+      // Drop rows awaiting a still-unconfirmed delete so the pull can't resurrect them.
+      const mergedReadings = mergeReadings(cleanedReadings, serverReadings).filter(
+        (r) => !deleteSet.has(r.id)
+      );
 
       const newCursor =
         maxUpdatedAt([...mergedAreas, ...mergedItems, ...mergedReadings]) ?? lastSyncedAt;
@@ -302,12 +342,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAreas(mergedAreas);
       setItems(mergedItems);
       setReadings(mergedReadings);
+      setPendingDeletes(remainingDeletes);
       if (newCursor) setLastSyncedAt(newCursor);
 
       const writes: [string, string][] = [
         [STORAGE_KEYS.areas, JSON.stringify(mergedAreas)],
         [STORAGE_KEYS.items, JSON.stringify(mergedItems)],
         [STORAGE_KEYS.readings, JSON.stringify(mergedReadings)],
+        [STORAGE_KEYS.pendingDeletes, JSON.stringify(remainingDeletes)],
       ];
       if (newCursor) writes.push([STORAGE_KEYS.lastSyncedAt, newCursor]);
       await AsyncStorage.multiSet(writes);
@@ -324,7 +366,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       syncInFlight.current = false;
     }
-  }, [areas, items, readings, lastSyncedAt]);
+  }, [areas, items, readings, lastSyncedAt, pendingDeletes]);
 
   const dirtyCount = useMemo(() => readings.filter((r) => r.isDirty).length, [readings]);
 
@@ -363,9 +405,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Also catches pending rows left over from a previous session at startup.
   useEffect(() => {
     if (!user || isDataLoading) return;
-    if (dirtyCount === 0) return;
+    if (dirtyCount === 0 && pendingDeletes.length === 0) return;
     triggerSync();
-  }, [dirtyCount, user, isDataLoading, triggerSync]);
+  }, [dirtyCount, pendingDeletes.length, user, isDataLoading, triggerSync]);
 
   const getItemsByAreaAndType = useCallback(
     (areaId: string, type: MonitoringType) =>
@@ -441,6 +483,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         diasSemLeitura = Math.max(0, countWorkdaysInMonth(year, month) - daysWithReading);
       }
 
+      // Horímetro: hours operated this month = last − first counter reading.
+      // Independent of monthlyCap — measured hours never feed the permit cap.
+      let horasOperadas: number | null = null;
+      if (item?.hasHorimetro) {
+        const horas = monthReadings
+          .map((r) => r.values.horimetro)
+          .filter((h): h is number => typeof h === 'number');
+        horasOperadas = horas.length >= 2 ? horas[horas.length - 1] - horas[0] : 0;
+      }
+
       const limiteOutorgado = item?.limiteOutorgado ?? 0;
       const monthlyCap =
         item?.type === 'hidrometro' && limiteOutorgado > 0
@@ -453,6 +505,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         maximo: type === 'hidrometro' ? null : Math.round(maximo * 100) / 100,
         minimo: type === 'hidrometro' ? null : Math.round(minimo * 100) / 100,
         diasSemLeitura,
+        horasOperadas: horasOperadas === null ? null : Math.round(horasOperadas * 100) / 100,
         limiteOutorgado,
         monthlyCap: Math.round(monthlyCap * 100) / 100,
         unit: item?.unit ?? '',
@@ -483,6 +536,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       retryBootstrap,
       addReading,
       updateReading,
+      deleteReading,
       getItemsByAreaAndType,
       getReadingsByItem,
       getLastReadingByItem,
@@ -494,7 +548,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       areas, items, readings, isDataLoading,
       sync, syncStatus, lastSyncedAt, syncError, dirtyCount,
       isBootstrapping, bootstrapError, readingsLoading, retryBootstrap,
-      addReading, updateReading, getItemsByAreaAndType, getReadingsByItem,
+      addReading, updateReading, deleteReading, getItemsByAreaAndType, getReadingsByItem,
       getLastReadingByItem, getLastReadingByArea, getStats,
     ]
   );

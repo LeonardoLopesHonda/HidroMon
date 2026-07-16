@@ -25,8 +25,13 @@ def get_readings(db: Session, since: datetime | None) -> list[ReadingResponse]:
 
 def create_reading(db: Session, data: ReadingCreate, user_id: uuid.UUID) -> ReadingResponse:
     item = _fetch_item(db, data.item_id)
-    valor, nivel, vazao, raw_values = _derive(item, data.values)
-    _assert_odometer(db, item, valor, data.date, data.recorded_at, exclude_id=None)
+    if item.disabled:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Item desativado não aceita novas leituras: {item.name}",
+        )
+    valor, horimetro, nivel, vazao, raw_values = _derive(item, data.values)
+    _assert_monotonic(db, item, valor, horimetro, data.date, data.recorded_at, exclude_id=None)
 
     now = datetime.now(timezone.utc)
     stmt = (
@@ -37,6 +42,7 @@ def create_reading(db: Session, data: ReadingCreate, user_id: uuid.UUID) -> Read
             date=data.date,
             recorded_at=data.recorded_at,
             valor=valor,
+            horimetro=horimetro,
             nivel=nivel,
             vazao=vazao,
             raw_values=raw_values,
@@ -60,10 +66,13 @@ def update_reading(
     if not reading:
         return None
     item = _fetch_item(db, reading.item_id)
-    valor, nivel, vazao, raw_values = _derive(item, data.values)
-    _assert_odometer(db, item, valor, reading.date, reading.recorded_at, exclude_id=reading.id)
+    valor, horimetro, nivel, vazao, raw_values = _derive(item, data.values)
+    _assert_monotonic(
+        db, item, valor, horimetro, reading.date, reading.recorded_at, exclude_id=reading.id
+    )
 
     reading.valor = valor
+    reading.horimetro = horimetro
     reading.nivel = nivel
     reading.vazao = vazao
     reading.raw_values = raw_values
@@ -72,6 +81,12 @@ def update_reading(
     db.commit()
     db.refresh(reading)
     return _to_response(reading)
+
+
+def delete_reading(db: Session, reading_id: uuid.UUID) -> None:
+    """Hard delete. Idempotent — a missing row is treated as already deleted."""
+    db.query(Reading).filter(Reading.id == reading_id).delete()
+    db.commit()
 
 
 def _fetch_item(db: Session, item_id: uuid.UUID) -> MonitoredItem:
@@ -83,16 +98,17 @@ def _fetch_item(db: Session, item_id: uuid.UUID) -> MonitoredItem:
 
 def _derive(
     item: MonitoredItem, values: ReadingValues
-) -> tuple[float | None, float | None, float | None, dict | None]:
-    """Split + derive wire values into (valor, nivel, vazao, raw_values).
+) -> tuple[float | None, float | None, float | None, float | None, dict | None]:
+    """Split + derive wire values into (valor, horimetro, nivel, vazao, raw_values).
 
     `vazao` is always server-computed for córrego items; any client value is dropped.
+    `horimetro` is only stored for horímetro-equipped items; ignored otherwise.
     """
     if item.type == "corrego":
         if item.corrego_method == "regua":
             nivel = values.nivel
             vazao = REGUA_COEFFICIENT * (nivel**1.5) if nivel and nivel > 0 else None
-            return None, nivel, vazao, None
+            return None, None, nivel, vazao, None
         if item.corrego_method == "tambor":
             t1, t2, t3 = values.t1, values.t2, values.t3
             if not (t1 and t1 > 0 and t2 and t2 > 0 and t3 and t3 > 0):
@@ -101,27 +117,64 @@ def _derive(
                     detail="Tambor requires all three fill-time samples (t1, t2, t3) > 0",
                 )
             vazao = TAMBOR_BUCKET_M3 / ((t1 + t2 + t3) / 3)
-            return None, None, vazao, {"t1": t1, "t2": t2, "t3": t3}
+            return None, None, None, vazao, {"t1": t1, "t2": t2, "t3": t3}
         raise HTTPException(
             status_code=422, detail=f"Córrego item missing corrego_method: {item.id}"
         )
     # hidrometro / pluviometro: pass valor straight through
-    return values.valor, None, None, None
+    horimetro = values.horimetro if item.has_horimetro else None
+    return values.valor, horimetro, None, None, None
 
 
-def _assert_odometer(
+def _assert_monotonic(
     db: Session,
     item: MonitoredItem,
     valor: float | None,
+    horimetro: float | None,
     new_date: date_type,
     new_recorded_at: datetime,
     exclude_id: uuid.UUID | None,
 ) -> None:
-    if item.type != "hidrometro" or valor is None:
+    """Cumulative counters must stay non-decreasing chronologically.
+
+    m³ (`valor`) is captured newest-last, so it's only checked against the immediately
+    prior reading. `horimetro` is sparse and backfilled out of order, so it's bounded by
+    its nearest *filled* neighbour on each side (blank horímetros are skipped)."""
+    if item.type != "hidrometro":
         return
-    prior_q = (
+
+    if valor is not None:
+        prior = _prior_reading(db, item.id, new_date, new_recorded_at, exclude_id)
+        if prior is not None and prior.valor is not None and valor < float(prior.valor):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Valor menor que leitura anterior: {prior.valor} m³",
+            )
+
+    if horimetro is not None:
+        lower, upper = _horimetro_bounds(db, item.id, new_date, new_recorded_at, exclude_id)
+        if lower is not None and horimetro < lower:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Horímetro menor que leitura anterior: {lower} h",
+            )
+        if upper is not None and horimetro > upper:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Horímetro maior que leitura posterior: {upper} h",
+            )
+
+
+def _prior_reading(
+    db: Session,
+    item_id: uuid.UUID,
+    new_date: date_type,
+    new_recorded_at: datetime,
+    exclude_id: uuid.UUID | None,
+) -> Reading | None:
+    q = (
         db.query(Reading)
-        .filter(Reading.item_id == item.id)
+        .filter(Reading.item_id == item_id)
         .filter(
             or_(
                 Reading.date < new_date,
@@ -130,13 +183,47 @@ def _assert_odometer(
         )
     )
     if exclude_id is not None:
-        prior_q = prior_q.filter(Reading.id != exclude_id)
-    prior = prior_q.order_by(Reading.date.desc(), Reading.recorded_at.desc()).first()
-    if prior and prior.valor is not None and valor < float(prior.valor):
-        raise HTTPException(
-            status_code=422,
-            detail=f"Valor menor que leitura anterior: {prior.valor} m³",
+        q = q.filter(Reading.id != exclude_id)
+    return q.order_by(Reading.date.desc(), Reading.recorded_at.desc()).first()
+
+
+def _horimetro_bounds(
+    db: Session,
+    item_id: uuid.UUID,
+    new_date: date_type,
+    new_recorded_at: datetime,
+    exclude_id: uuid.UUID | None,
+) -> tuple[float | None, float | None]:
+    """Nearest earlier / later readings that actually carry a horímetro."""
+    base = db.query(Reading).filter(
+        Reading.item_id == item_id, Reading.horimetro.isnot(None)
+    )
+    if exclude_id is not None:
+        base = base.filter(Reading.id != exclude_id)
+
+    earlier = (
+        base.filter(
+            or_(
+                Reading.date < new_date,
+                and_(Reading.date == new_date, Reading.recorded_at < new_recorded_at),
+            )
         )
+        .order_by(Reading.date.desc(), Reading.recorded_at.desc())
+        .first()
+    )
+    later = (
+        base.filter(
+            or_(
+                Reading.date > new_date,
+                and_(Reading.date == new_date, Reading.recorded_at > new_recorded_at),
+            )
+        )
+        .order_by(Reading.date.asc(), Reading.recorded_at.asc())
+        .first()
+    )
+    lower = float(earlier.horimetro) if earlier and earlier.horimetro is not None else None
+    upper = float(later.horimetro) if later and later.horimetro is not None else None
+    return lower, upper
 
 
 def _to_response(r: Reading) -> ReadingResponse:
@@ -148,6 +235,7 @@ def _to_response(r: Reading) -> ReadingResponse:
         recorded_at=r.recorded_at,
         values=ReadingValues(
             valor=r.valor,
+            horimetro=r.horimetro,
             nivel=r.nivel,
             vazao=r.vazao,
             t1=raw.get("t1"),

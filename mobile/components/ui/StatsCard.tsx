@@ -68,6 +68,9 @@ export function StatsCard({ stats }: Props) {
           value={stats.monthlyCap > 0 ? formatValue(stats.monthlyCap, stats.unit) : '—'}
           alert={overLimit}
         />
+        {stats.horasOperadas !== null && (
+          <StatTile label="Horas operadas" value={formatValue(stats.horasOperadas, 'h')} />
+        )}
       </View>
       {overLimit && (
         <View style={styles.alertBanner}>

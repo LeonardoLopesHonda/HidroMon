@@ -24,12 +24,19 @@ interface FieldConfig {
   key: string;
   label: string;
   placeholder?: string;
+  optional?: boolean;
 }
 
 function getFieldConfigs(item: MonitoredItem): FieldConfig[] {
   switch (item.type) {
-    case 'hidrometro':
-      return [{ key: 'valor', label: 'Leitura (m³)', placeholder: '0.0' }];
+    case 'hidrometro': {
+      const configs: FieldConfig[] = [{ key: 'valor', label: 'Leitura (m³)', placeholder: '0.0' }];
+      if (item.hasHorimetro) {
+        // Not read on-site — backfilled later from the third-party app. Optional.
+        configs.push({ key: 'horimetro', label: 'Horímetro (h)', placeholder: '0.0', optional: true });
+      }
+      return configs;
+    }
     case 'pluviometro':
       return [{ key: 'valor', label: 'Precipitação (mm)', placeholder: '0.0' }];
     case 'corrego':
@@ -94,7 +101,7 @@ export default function FormScreen() {
     itemId: string;
     readingId?: string;
   }>();
-  const { items, readings, addReading, updateReading, getReadingsByItem, getLastReadingByItem } = useApp();
+  const { items, readings, addReading, updateReading, deleteReading, getReadingsByItem, getLastReadingByItem } = useApp();
   const navigation = useNavigation();
 
   const isEditing = !!readingId;
@@ -129,6 +136,28 @@ export default function FormScreen() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [observacoes, setObservacoes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Horímetro is sparse and backfilled out of order, so it's bounded on BOTH sides:
+  // ≥ nearest earlier reading that has one, ≤ nearest later reading that has one.
+  // Readings with a blank horímetro are skipped.
+  const currentDateStr = toDateString(date);
+  const horimetroBounds = useMemo((): { lower: number | null; upper: number | null } => {
+    if (!item?.hasHorimetro) return { lower: null, upper: null };
+    const sorted = getReadingsByItem(itemId!)
+      .filter((r) => !(isEditing && r.id === readingId))
+      .filter((r) => r.values.horimetro != null)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    let lower: number | null = null;
+    let upper: number | null = null;
+    for (const r of sorted) {
+      if (r.date <= currentDateStr) lower = r.values.horimetro!;
+      else {
+        upper = r.values.horimetro!;
+        break;
+      }
+    }
+    return { lower, upper };
+  }, [item, isEditing, readingId, itemId, currentDateStr, getReadingsByItem]);
 
   // Pre-fill form when editing
   useEffect(() => {
@@ -177,7 +206,8 @@ export default function FormScreen() {
     for (const field of fields) {
       const raw = fieldValues[field.key] ?? '';
       if (!raw.trim()) {
-        errors[field.key] = 'Campo obrigatório';
+        // Optional fields (e.g. horímetro, backfilled later) may be left blank.
+        if (!field.optional) errors[field.key] = 'Campo obrigatório';
       } else {
         const num = parseNum(raw);
         if (isNaN(num) || num < 0) {
@@ -194,6 +224,19 @@ export default function FormScreen() {
       const nova = parseNum(fieldValues.valor ?? '');
       if (!isNaN(nova) && nova < leituraLowerBound) {
         errors.valor = `Valor menor que leitura anterior: ${leituraLowerBound.toLocaleString('pt-BR')} m³`;
+      }
+    }
+
+    // Horímetro is a cumulative counter bounded by its filled neighbours on both sides.
+    const rawHorimetro = fieldValues.horimetro ?? '';
+    if (item?.hasHorimetro && rawHorimetro.trim()) {
+      const nova = parseNum(rawHorimetro);
+      if (!isNaN(nova)) {
+        if (horimetroBounds.lower !== null && nova < horimetroBounds.lower) {
+          errors.horimetro = `Horímetro menor que leitura anterior: ${horimetroBounds.lower.toLocaleString('pt-BR')} h`;
+        } else if (horimetroBounds.upper !== null && nova > horimetroBounds.upper) {
+          errors.horimetro = `Horímetro maior que leitura posterior: ${horimetroBounds.upper.toLocaleString('pt-BR')} h`;
+        }
       }
     }
 
@@ -231,7 +274,10 @@ export default function FormScreen() {
     try {
       const values: ReadingValues = {};
       for (const field of fields) {
-        (values as Record<string, number>)[field.key] = parseNum(fieldValues[field.key] ?? '0');
+        const raw = fieldValues[field.key] ?? '';
+        // A blank optional field (horímetro not yet backfilled) stays unset — not 0.
+        if (field.optional && !raw.trim()) continue;
+        (values as Record<string, number>)[field.key] = parseNum(raw || '0');
       }
 
       if (isEditing && readingId) {
@@ -262,6 +308,25 @@ export default function FormScreen() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleDelete = () => {
+    if (!readingId) return;
+    Alert.alert(
+      'Excluir leitura',
+      'Esta ação não pode ser desfeita. Deseja excluir esta leitura?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteReading(readingId);
+            router.back();
+          },
+        },
+      ]
+    );
   };
 
   const handleDateChange = (_: unknown, selected?: Date) => {
@@ -382,6 +447,24 @@ export default function FormScreen() {
             </View>
           )}
 
+          {/* Horímetro: neighbour bounds + skippable hint */}
+          {item?.hasHorimetro && (
+            <View style={styles.hintBox}>
+              {(horimetroBounds.lower !== null || horimetroBounds.upper !== null) && (
+                <Text style={[Typography.caption, { color: Colors.gray600 }]}>
+                  {horimetroBounds.lower !== null &&
+                    `Horímetro anterior: ${horimetroBounds.lower.toLocaleString('pt-BR')} h`}
+                  {horimetroBounds.lower !== null && horimetroBounds.upper !== null && '  ·  '}
+                  {horimetroBounds.upper !== null &&
+                    `Próximo: ${horimetroBounds.upper.toLocaleString('pt-BR')} h`}
+                </Text>
+              )}
+              <Text style={[Typography.caption, { color: Colors.gray400, marginTop: 2 }]}>
+                Opcional — preencher depois com o dado do app terceiro
+              </Text>
+            </View>
+          )}
+
           {/* Córrego: live flow preview */}
           {preview !== null && (
             <View style={styles.previewBox}>
@@ -413,6 +496,12 @@ export default function FormScreen() {
           style={styles.saveButton}
         />
         <Button label="Cancelar" variant="ghost" onPress={() => router.back()} />
+
+        {isEditing && (
+          <Pressable onPress={handleDelete} style={styles.deleteButton} hitSlop={8}>
+            <Text style={[Typography.headline, { color: Colors.danger }]}>Excluir leitura</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -476,5 +565,10 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginBottom: Spacing.sm,
+  },
+  deleteButton: {
+    height: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

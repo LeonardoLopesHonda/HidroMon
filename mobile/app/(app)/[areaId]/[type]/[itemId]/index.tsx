@@ -69,6 +69,7 @@ export default function ItemDetailScreen() {
             reading={reading}
             type={type!}
             corregoMethod={item?.corregoMethod}
+            hasHorimetro={item?.hasHorimetro}
             onPress={() =>
               router.push({
                 pathname: '/(app)/[areaId]/[type]/[itemId]/form' as never,
@@ -88,14 +89,16 @@ export default function ItemDetailScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
       />
-      <FAB
-        onPress={() =>
-          router.push({
-            pathname: '/(app)/[areaId]/[type]/[itemId]/form' as never,
-            params: { areaId, type, itemId },
-          })
-        }
-      />
+      {!item?.disabled && (
+        <FAB
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/[areaId]/[type]/[itemId]/form' as never,
+              params: { areaId, type, itemId },
+            })
+          }
+        />
+      )}
     </View>
   );
 }

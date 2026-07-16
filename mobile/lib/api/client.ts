@@ -25,7 +25,7 @@ async function authHeader(): Promise<Record<string, string>> {
 }
 
 async function request<T>(
-  method: 'GET' | 'POST' | 'PUT',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   path: string,
   body?: unknown,
   params?: QueryParams
@@ -62,4 +62,5 @@ export const apiClient = {
   get: <T>(path: string, params?: QueryParams) => request<T>('GET', path, undefined, params),
   post: <T>(path: string, body: unknown) => request<T>('POST', path, body),
   put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
+  del: (path: string) => request<null>('DELETE', path),
 };

@@ -58,8 +58,18 @@ The outorga document explicitly fixes the month at **30 days** ("30 dias/mês"),
 
 > **Design note:** `horasOperacao` is not yet tracked in the app. It defaults to 24h for all items. This must be added to `MonitoredItem` when meters capable of tracking operating hours are deployed. The data model should accommodate this without a breaking change.
 
+### Horímetro
+An hour-meter: a cumulative counter on a hidrômetro's pump/motor that records the total number of hours it has operated. Read off the physical device exactly like the m³ odometer — a monotonically non-decreasing sequence of numbers. Only some hidrômetros carry one (a horímetro-equipped meter was installed in place of an older meter that had none).
+
+The horímetro is an **optional value on a Reading**, distinct from **`horasOperacao`** (the outorga's *authorized* operating hours/day, a fixed assumption used in the monthly cap). One is measured, the other is permitted.
+
+**The hours are not read on-site.** The field operator has no gauge to read the horímetro from — the hours data lives in a separate third-party app the operator cannot access. So a monitoring Reading is saved with the m³ value and the horímetro left **blank**, and the hours are **backfilled later** (via the normal edit flow) by whoever has the third-party data. Horímetro values are therefore *sparse* — present on some readings, absent on others — and entered *out of chronological order*.
+
 ### MonitoredItem (Item Monitorado)
-A physical measurement point within an Área. Each item belongs to one Área and has one MonitoringType. Only hidrômetros carry a meaningful `limiteOutorgado`; pluviômetros and córregos have no permit-based consumption cap.
+A physical measurement point within an Área. Each item belongs to one Área and has one MonitoringType. Only hidrômetros carry a meaningful `limiteOutorgado`; pluviômetros and córregos have no permit-based consumption cap. A hidrômetro may additionally be **horímetro-equipped** — see [Horímetro](#horímetro) — in which case each reading also captures the hour counter.
+
+### Disabled Item
+A MonitoredItem can be **disabled** (retired) when the physical device is decommissioned — typically when a meter is replaced by a newer one. A disabled item **no longer accepts new readings**, but its history is preserved and remains fully visible; past readings can still be corrected. Disabling is about stopping new activity, not freezing the record. The replacement is modelled as a *separate* MonitoredItem, so each physical device keeps its own uninterrupted reading history.
 
 ### MonitoringType
 The category of a MonitoredItem. Three types exist with distinct purposes:
@@ -105,6 +115,7 @@ The item detail screen shows stats to help the operator be proactively aware —
 | Média | Not meaningful (cumulative values) | Average daily precipitation | Average level / flow |
 | Máximo / Mínimo | Not meaningful | Max/min precipitation day | Max/min level / flow |
 | Dias sem leitura | Working days in month (excl. Sundays) minus days with readings | Same | Not applicable (weekly cadence) |
+| Horas operadas | `lastHorímetro − firstHorímetro` of month — only for horímetro-equipped hidrômetros; does **not** feed the cap | — | — |
 
 No automated alerts are required in v1. High consumption awareness is informal.
 
@@ -123,7 +134,7 @@ The supervisor's review, compliance analysis, and reporting happen in a separate
 - Conflict resolution strategy: always one operator per Área (lean crew), so last-write-wins on sync is sufficient — no multi-device concurrency
 
 ### Reading (Leitura)
-A measurement captured on a specific date for a MonitoredItem. A Reading records the measured values and an optional observation note. Readings are **edit-only** — they can be corrected (PUT) but never deleted. The single-writer invariant (one device per Área registers readings) means soft-delete tombstones are unnecessary; see ADR 0006.
+A measurement captured on a specific date for a MonitoredItem. A Reading records the measured values and an optional observation note. Readings are corrected by editing (PUT). They can also be **hard-deleted** — physically removed — for rows that shouldn't exist at all (full duplicates) or that were logged against the wrong item, which editing can't repair. Deletion is irreversible and leaves no audit trail; see ADR 0008 (which amends ADR 0006's original edit-only stance).
 
 **Hidrômetro readings are cumulative** — the value recorded is the odometer counter on the physical meter (e.g., 1042 m³), not the consumption since the last visit. Monthly consumption must therefore be derived as `lastReading − firstReading` (or last reading of month − last reading of previous month), not as a sum of readings. The current `getStats` code incorrectly sums readings — this is a known bug.
 
@@ -152,7 +163,7 @@ Decisions formalised in ADR 0006:
 - **`isDirty` and `syncedAt` are mobile-only.** They describe the AsyncStorage cache's relationship to the server, not properties of a reading. They never appear in Postgres or in API responses.
 - **`createdBy`** on `Reading` carries the JWT subject (`auth.users.id`). Three accounts exist: shared crew account (used by both 3rd-party operators), project owner, supervisor. Most rows carry the crew UUID; rows created by owner/supervisor are distinguishable in queries.
 - **No `profiles` table.** Operator identity is not modelled inside the app — `auth.users` alone is enough. Operator names go in `observacoes` when relevant.
-- **Edit-only.** No DELETE endpoint, no `deleted_at` column. Mistakes are corrected by PUT.
+- **Edit + hard delete.** Mistakes are corrected by PUT; rows that shouldn't exist are removed via `DELETE /readings/{id}` (idempotent, no `deleted_at`). Mobile queues deletes offline in a pending-delete list and drains it on sync. See ADR 0008.
 - **Auth.** Supabase email + password, invite-only. FastAPI is a resource server that verifies JWTs (ES256 via JWKS); it never sees passwords. Mobile uses `@supabase/supabase-js` with the default AsyncStorage session adapter.
 
 ### Sync Triggers and Logout

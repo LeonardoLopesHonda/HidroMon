@@ -41,3 +41,14 @@ def update_reading(
     if not reading:
         raise HTTPException(status_code=404, detail="Reading not found")
     return reading
+
+
+@router.delete("/readings/{reading_id}", status_code=204)
+def delete_reading(
+    reading_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: str = Depends(get_current_user),
+):
+    # Idempotent hard delete: deleting an already-gone row is a no-op success,
+    # so the mobile pending-delete queue always drains (ADR 0008).
+    reading_service.delete_reading(db, reading_id)
