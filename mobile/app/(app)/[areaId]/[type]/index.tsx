@@ -55,7 +55,12 @@ export default function TypeScreen() {
           <View style={styles.cardLeft}>
             <View style={styles.titleRow}>
               <Text
-                style={[Typography.headline, { color: item.disabled ? Colors.gray400 : Colors.black }]}
+                numberOfLines={1}
+                style={[
+                  Typography.headline,
+                  styles.itemName,
+                  { color: item.disabled ? Colors.gray400 : Colors.black },
+                ]}
               >
                 {item.name}
               </Text>
@@ -118,7 +123,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
   },
+  itemName: {
+    flexShrink: 1,
+  },
   disabledBadge: {
+    flexShrink: 0,
     backgroundColor: Colors.gray100,
     borderRadius: 6,
     paddingHorizontal: Spacing.sm,

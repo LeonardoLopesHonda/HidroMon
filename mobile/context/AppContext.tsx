@@ -6,9 +6,14 @@ import { AppState } from 'react-native';
 
 import { apiClient } from '@/lib/api/client';
 import { supabase } from '@/lib/supabase';
+import { mockAreas, mockItems, mockReadings } from '@/data/mockData';
 import { pullAreas, pullItems, pullReadings } from '@/lib/sync/pull';
 import { pushDeletes, pushDirty } from '@/lib/sync/push';
 import { Area, MonitoredItem, MonitoringType, Reading, ReadingStats, User } from '@/types';
+
+// DEV-ONLY: EXPO_PUBLIC_USE_MOCK=1 loads mockData and bypasses auth + backend sync,
+// so the UI can be exercised locally with `expo start`. Off in every normal build.
+const USE_MOCK = process.env.EXPO_PUBLIC_USE_MOCK === '1';
 
 type SyncStatus = 'idle' | 'syncing' | 'error';
 
@@ -119,6 +124,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Auth: hydrate from supabase-js session, subscribe to changes.
   useEffect(() => {
+    if (USE_MOCK) {
+      setUser({ id: 'mock-user', email: 'mock@telos.dev' });
+      setIsAuthLoading(false);
+      return;
+    }
     supabase.auth.getSession().then(({ data }) => {
       const s = data.session;
       setUser(s?.user ? { id: s.user.id, email: s.user.email ?? '' } : null);
@@ -133,6 +143,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Data load on user change. First login (no cache) blocks on master data, streams readings.
   useEffect(() => {
     if (!user) {
+      setIsDataLoading(false);
+      return;
+    }
+    if (USE_MOCK) {
+      setAreas(mockAreas);
+      setItems(mockItems);
+      setReadings(mockReadings);
       setIsDataLoading(false);
       return;
     }
@@ -222,6 +239,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const retryBootstrap = useCallback(() => setBootstrapNonce((n) => n + 1), []);
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    if (USE_MOCK) return true;
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
@@ -292,6 +310,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const sync = useCallback(async () => {
+    if (USE_MOCK) return; // no backend in mock mode
     if (syncInFlight.current) return;
     syncInFlight.current = true;
     setSyncStatus('syncing');
