@@ -92,7 +92,11 @@ FastAPI + Python. See `docs/adr/0001-offline-first-sync.md` for the sync contrac
 
 ## Testing
 
-No test infrastructure is currently configured.
+Backend: `pytest` (via `uv run pytest` from `backend/`), `tests/` mirrors `app/`. No test infrastructure yet for mobile/web.
+
+## Workflow
+
+Standard loop for any task: **code → test → commit → review**. Implement the change, verify it (run/write tests; use the `verify` skill when there's runtime behavior to exercise), commit it (see Git Conventions below), then run `/code-review` on the diff. Proceed through these steps without pausing to ask permission at each one — only stop for a judgment call that genuinely needs the user (e.g. an ambiguous requirement, a destructive/irreversible action, or a scope question).
 
 ## Git Conventions
 
