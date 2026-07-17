@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
+from app.db.database import Area, MonitoredItem
 from app.models.item import ItemResponse
 
 
@@ -49,4 +50,24 @@ def test_durh_fields_serialize_null_when_unset():
 
     assert payload["durhNumber"] is None
     assert payload["outorgaNumber"] is None
+    assert payload["barramentoDurh"] is None
+
+
+def test_durh_fields_round_trip_through_orm(db_session):
+    area = db_session.query(Area).first()
+    item = MonitoredItem(
+        **_base_kwargs(
+            area_id=area.id,
+            durh_number="DURH-999",
+            outorga_number="OUT-999",
+        )
+    )
+    db_session.add(item)
+    db_session.flush()
+
+    fetched = db_session.query(MonitoredItem).filter(MonitoredItem.id == item.id).one()
+    payload = ItemResponse.model_validate(fetched).model_dump(by_alias=True)
+
+    assert payload["durhNumber"] == "DURH-999"
+    assert payload["outorgaNumber"] == "OUT-999"
     assert payload["barramentoDurh"] is None
