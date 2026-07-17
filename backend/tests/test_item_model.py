@@ -54,7 +54,16 @@ def test_durh_fields_serialize_null_when_unset():
 
 
 def test_durh_fields_round_trip_through_orm(db_session):
-    area = db_session.query(Area).first()
+    area = Area(
+        id=uuid.uuid4(),
+        name="Área de teste",
+        frequency="daily",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(area)
+    db_session.flush()
+
     item = MonitoredItem(
         **_base_kwargs(
             area_id=area.id,
