@@ -7,7 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 ```
 /
 ├── mobile/    ← Expo app (React Native + TypeScript)
-├── backend/   ← FastAPI API (Python) — to be scaffolded
+├── backend/   ← FastAPI API (Python)
+├── web/       ← Supervisor web dashboard (Vite + React + TypeScript)
 ├── docs/adr/  ← Architecture decision records
 ├── CONTEXT.md ← Domain glossary and known issues
 └── README.md
@@ -57,9 +58,37 @@ bun run lint          # Run ESLint
 
 See `CONTEXT.md` → Known Issues section for bugs and missing model fields that must be addressed before FastAPI integration.
 
+## Web Dashboard (web/)
+
+**Package Manager:** Bun
+
+```bash
+cd web
+
+bun install           # Install dependencies
+bun run dev           # Start Vite dev server
+bun run build          # Typecheck + production build
+bun run lint           # Run oxlint
+```
+
+**Stack:** Vite + React 19 + TypeScript + React Router. Desktop-first, pt-BR. See `docs/prd/web-dashboard.md` for the full feature set and `docs/adr/0009-web-second-writer-sticky-horimetro.md` for the sync contract with mobile.
+
+### Key Directories
+
+- `web/src/pages/` — routed screens (LoginPage, AreasPage, …)
+- `web/src/context/AuthContext.tsx` — Supabase session state, login/logout
+- `web/src/lib/supabase.ts` — Supabase client
+- `web/src/lib/api/` — authenticated FastAPI client
+- `web/src/components/ui/` — UI primitives
+- `web/src/types/index.ts` — domain types (mirrors mobile's, trimmed to what the dashboard reads)
+
+### Path Alias
+
+`@/*` maps to `web/src/*`
+
 ## Backend (backend/)
 
-FastAPI + Python — not yet scaffolded. See `docs/adr/0001-offline-first-sync.md` for the sync contract the API must implement.
+FastAPI + Python. See `docs/adr/0001-offline-first-sync.md` for the sync contract the API implements.
 
 ## Testing
 

@@ -1,0 +1,63 @@
+:root {
+  --color-bg: #f6f7f5;
+  --color-surface: #ffffff;
+  --color-surface-muted: #fafbfa;
+  --color-border: #e2e7e3;
+  --color-border-light: #eef1ee;
+  --color-border-input: #d7ded9;
+
+  --color-text: #1c2822;
+  --color-text-muted: #5c6b63;
+  --color-text-faint: #8a978f;
+  --color-text-faintest: #c3cbc5;
+
+  --color-accent: #177863;
+  --color-accent-hover: #0e5a4a;
+  --color-accent-bg: #e6efe9;
+
+  --color-ok-bg: #e9f4ee;
+  --color-ok-text: #1e7d4f;
+  --color-warn-bg: #fbf3e2;
+  --color-warn-text: #9a6200;
+  --color-warn-accent: #d98e0b;
+  --color-danger-bg: #fbecea;
+  --color-danger-text: #b3362b;
+  --color-info-bg: #eaf1f5;
+  --color-info-text: #2f6b8f;
+  --color-disabled-bg: #eef1ee;
+  --color-disabled-text: #8a978f;
+
+  --font-sans: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+input,
+button,
+select,
+textarea {
+  font-family: inherit;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid #a9d3c6;
+  outline-offset: 1px;
+}
+
+button {
+  cursor: pointer;
+}

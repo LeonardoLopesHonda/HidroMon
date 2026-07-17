@@ -17,6 +17,14 @@ mobile/.env
 mobile/.env.*
 !mobile/.env.example
 
+# ── Web (Vite) ──────────────────────────────────────────────────
+web/node_modules/
+web/dist/
+web/*.tsbuildinfo
+web/.env
+web/.env.*
+!web/.env.example
+
 # ── Backend (FastAPI / Python) ─────────────────────────────────
 __pycache__/
 *.pyc
