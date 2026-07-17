@@ -24,6 +24,9 @@ These are confirmed bugs and missing model fields discovered during domain analy
 | `Reading` | `createdBy` | `string` (UUID) | `auth.users.id` of the JWT subject. Server-set on insert. |
 | `Reading` (mobile only) | `isDirty` | `boolean` | True until synced to backend. **Not** persisted in Postgres. |
 | `Reading` (mobile only) | `syncedAt` | `string \| null` | Mobile copies the server's `updatedAt` here after a successful sync. **Not** persisted in Postgres. |
+| `MonitoredItem` | `durhNumber` | `string \| null` | Nº da DURH — identifies the capture point on the IMASUL form. Null for non-hidrômetros. |
+| `MonitoredItem` | `outorgaNumber` | `string \| null` | Nº da Outorga on the IMASUL form. Null for non-hidrômetros. |
+| `MonitoredItem` | `barramentoDurh` | `string \| null` | DURH of a linked barramento (dam), if any — optional field on the IMASUL form. |
 
 ### Missing Operations
 
@@ -46,7 +49,7 @@ A licensed property (fazenda, mine site, or industrial area) that holds one or m
 Reading frequency is defined at the Área level — all items within an Área share the same reading cadence (`frequency: 'daily' | 'weekly'`). The operator visits all instruments in an Área on the same day.
 
 ### Outorga
-A Brazilian water-use permit issued by the competent authority (e.g., IGAM, ANA) that authorizes the use of a specific water body up to a defined flow rate and daily operating window. Each hidrômetro carries the limit granted by its outorga.
+A Brazilian water-use permit issued by the competent authority — for this project, **IMASUL** (Instituto de Meio Ambiente de Mato Grosso do Sul) — that authorizes the use of a specific water body up to a defined flow rate and daily operating window. Each hidrômetro carries the limit granted by its outorga, identified on filings by its **Nº da Outorga** and **Nº da DURH** (Declaração de Uso de Recursos Hídricos).
 
 Key fields per outorga:
 - **`limiteOutorgado`** — maximum flow rate in m³/h
@@ -56,6 +59,8 @@ Derived monthly cap = `limiteOutorgado × horasOperacao × 30`
 
 The outorga document explicitly fixes the month at **30 days** ("30 dias/mês"), regardless of actual calendar days. The app always uses 30 — not `daysInMonth` — so the cap matches the permit exactly.
 
+> **Two day-count conventions coexist — do not "fix" one to match the other.** The permit cap uses a fixed 30-day month (above). The IMASUL Formulário de Monitoramento uses **actual calendar days** per month (28/29/30/31) in its Período column. Both are correct in their own context.
+
 > **Design note:** `horasOperacao` is not yet tracked in the app. It defaults to 24h for all items. This must be added to `MonitoredItem` when meters capable of tracking operating hours are deployed. The data model should accommodate this without a breaking change.
 
 ### Horímetro
@@ -63,7 +68,9 @@ An hour-meter: a cumulative counter on a hidrômetro's pump/motor that records t
 
 The horímetro is an **optional value on a Reading**, distinct from **`horasOperacao`** (the outorga's *authorized* operating hours/day, a fixed assumption used in the monthly cap). One is measured, the other is permitted.
 
-**The hours are not read on-site.** The field operator has no gauge to read the horímetro from — the hours data lives in a separate third-party app the operator cannot access. So a monitoring Reading is saved with the m³ value and the horímetro left **blank**, and the hours are **backfilled later** (via the normal edit flow) by whoever has the third-party data. Horímetro values are therefore *sparse* — present on some readings, absent on others — and entered *out of chronological order*.
+**The hours are not read on-site.** The field operator has no gauge to read the horímetro from — the hours data lives in a separate third-party app the operator cannot access. So a monitoring Reading is saved with the m³ value and the horímetro left **blank**, and the hours are **backfilled later** by whoever has the third-party data. The web dashboard is the primary backfill surface (an editable horímetro column on the item's reading history); the mobile edit flow also works. Horímetro values are therefore *sparse* — present on some readings, absent on others — and entered *out of chronological order*.
+
+**Horímetro integrity (neighbor-bounded):** like the m³ odometer, the horímetro is monotonically non-decreasing — but because values arrive out of order, a backfilled value is validated against both chronological neighbors that carry hours: it must be ≥ the nearest earlier reading with hours and ≤ the nearest later reading with hours. Enforced inline on the client and as a 422 on the server. A backfilled value is also **sticky**: once set, an update carrying a blank horímetro never erases it (see ADR 0009) — corrections are made by writing a new value.
 
 ### MonitoredItem (Item Monitorado)
 A physical measurement point within an Área. Each item belongs to one Área and has one MonitoringType. Only hidrômetros carry a meaningful `limiteOutorgado`; pluviômetros and córregos have no permit-based consumption cap. A hidrômetro may additionally be **horímetro-equipped** — see [Horímetro](#horímetro) — in which case each reading also captures the hour counter.
@@ -119,6 +126,27 @@ The item detail screen shows stats to help the operator be proactively aware —
 
 No automated alerts are required in v1. High consumption awareness is informal.
 
+### Formulário de Monitoramento (IMASUL)
+
+The official annual reporting form filed with IMASUL, one per capture point (outorga). Identified by Nº da DURH, Nº da Outorga, and year. Contains 12 monthly rows, each with:
+
+- **Vazão (m³/h)** — the month's average hourly captured flow: `monthly consumption ÷ (Período × Tempo)`
+- **Tempo (h/dia)** — the item's `horasOperacao`
+- **Período (dias/mês)** — actual calendar days of the month (28/29/30/31 — *not* the fixed 30 used for the cap)
+
+Monthly consumption for the form uses the **month-boundary convention**: `last reading of month − last reading of previous month` (falling back to the month's first reading at the start of history), so no consumption is lost between a month's last reading and the next month's first. Months with no data show 0,00.
+
+The form also carries filing fields not derived from readings: Técnico Responsável, CREA, Data, an optional barramento DURH, and a free-text "outros dados relevantes" block. These are entered at generation time (técnico/CREA prefilled from last use). The form applies to hidrômetros only — pluviômetro and córrego data have no cell in it.
+
+### Dashboard Metrics (Web)
+
+Canonical names for the derived metrics shown in the supervisor web dashboard. All consumption math respects the cumulative-odometer rule (deltas, never sums).
+
+- **Taxa diária** — normalized daily consumption: `(reading − previous reading) ÷ days elapsed`. When readings are >1 day apart (Sundays, missed days), the delta is spread evenly — no artificial spikes on the first reading after a gap.
+- **Vazão média (outorga)** — permitted-basis hourly rate: `daily consumption ÷ horasOperacao`. Computable for every hidrômetro; directly comparable to `limiteOutorgado` (m³/h).
+- **Vazão efetiva (horímetro)** — measured hourly rate: `Δm³ ÷ Δhorímetro hours` between horímetro-bearing readings. Only exists for horímetro-equipped items; sparse by nature. Measured vs permitted — never conflate the two.
+- **Exceedance checks** (four): month-to-date consumption vs the 30-day cap; month-end projection at current pace vs cap; taxa diária vs daily cap (`limiteOutorgado × horasOperacao`); measured operating hours/day (Δhorímetro ÷ days elapsed) vs `horasOperacao`.
+
 ### System Boundaries
 
 This mobile app serves three purposes:
@@ -126,7 +154,7 @@ This mobile app serves three purposes:
 2. **Offline operation** — the app must work with no internet signal (field sites may have no connectivity)
 3. **Backend sync** — once internet is available, all locally captured readings are pushed to the backend
 
-The supervisor's review, compliance analysis, and reporting happen in a separate interface (not yet built). The app does not serve the supervisor's analytical workflow directly.
+The supervisor's review, compliance analysis, and reporting happen in a separate interface — the **web dashboard** (`web/`, Vite + React SPA): read-only analytics plus exactly one write flow, horímetro backfill. It authenticates with the same three Supabase accounts (no roles) and consumes the same FastAPI. Its existence makes the system **two-writer** for readings, which motivates the sticky-horímetro rule (ADR 0009). The mobile app does not serve the supervisor's analytical workflow directly.
 
 **Implication:** The app is an offline-first sync client. Data lives in AsyncStorage until synced. The FastAPI backend does not exist yet — the app's data model will drive the API schema. This requires:
 - Stable IDs that don't collide across devices (current `Date.now()` IDs are not safe — UUIDs needed)
