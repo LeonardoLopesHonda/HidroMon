@@ -111,7 +111,7 @@ The item detail screen shows stats to help the operator be proactively aware —
 | Stat | Hidrômetro | Pluviômetro | Córrego |
 |---|---|---|---|
 | Monthly consumption | `lastReading − firstReading` of month (not sum) | Sum of precipitation values | Not meaningful |
-| vs cap | Show consumption vs monthly cap (`limiteOutorgado × horasOperacao × daysInMonth`) | — | — |
+| vs cap | Show consumption vs monthly cap (`limiteOutorgado × horasOperacao × 30` — fixed 30 days per the outorga) | — | — |
 | Média | Not meaningful (cumulative values) | Average daily precipitation | Average level / flow |
 | Máximo / Mínimo | Not meaningful | Max/min precipitation day | Max/min level / flow |
 | Dias sem leitura | Working days in month (excl. Sundays) minus days with readings | Same | Not applicable (weekly cadence) |
