@@ -46,6 +46,9 @@ class MonitoredItem(Base):
     corrego_method: Mapped[str | None] = mapped_column(String)
     has_horimetro: Mapped[bool] = mapped_column(Boolean)
     disabled: Mapped[bool] = mapped_column(Boolean)
+    durh_number: Mapped[str | None] = mapped_column(String)
+    outorga_number: Mapped[str | None] = mapped_column(String)
+    barramento_durh: Mapped[str | None] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 

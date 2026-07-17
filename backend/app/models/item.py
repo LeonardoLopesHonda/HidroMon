@@ -22,5 +22,8 @@ class ItemResponse(BaseModel):
     corrego_method: str | None
     has_horimetro: bool
     disabled: bool
+    durh_number: str | None
+    outorga_number: str | None
+    barramento_durh: str | None
     created_at: datetime
     updated_at: datetime
