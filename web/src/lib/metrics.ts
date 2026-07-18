@@ -164,9 +164,13 @@ export function exceedanceChecks(params: {
   measuredHoursPerDay: number | null;
   horasOperacao: number;
 }): ExceedanceChecks {
-  const monthToDateOver = params.monthToDateConsumption > params.cap;
-  const projectedOver = params.projection > params.cap;
-  const dailyRateOver = params.latestDailyRate != null && params.latestDailyRate > params.dailyCap;
+  // cap/dailyCap are 0 when limiteOutorgado isn't configured yet (nullable — see
+  // MonitoredItem.limiteOutorgado) — that's "no permit limit set", not "already over
+  // a zero limit", so every cap-based check is gated on the cap actually being set.
+  const monthToDateOver = params.cap > 0 && params.monthToDateConsumption > params.cap;
+  const projectedOver = params.cap > 0 && params.projection > params.cap;
+  const dailyRateOver =
+    params.dailyCap > 0 && params.latestDailyRate != null && params.latestDailyRate > params.dailyCap;
   const hoursOver = params.measuredHoursPerDay != null && params.measuredHoursPerDay > params.horasOperacao;
 
   return {

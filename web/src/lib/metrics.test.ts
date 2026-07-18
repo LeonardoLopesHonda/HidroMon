@@ -159,6 +159,16 @@ describe('exceedanceChecks', () => {
     const result = exceedanceChecks({ ...base, measuredHoursPerDay: null });
     expect(result.hoursOver).toBe(false);
   });
+
+  it('does not flag any cap-based exceedance when no outorga limit is configured yet', () => {
+    // cap/dailyCap are 0 when limiteOutorgado is null (monthlyCap's own contract) —
+    // that must read as "no limit set", never as "already over a zero limit".
+    const result = exceedanceChecks({ ...base, cap: 0, dailyCap: 0 });
+    expect(result.monthToDateOver).toBe(false);
+    expect(result.projectedOver).toBe(false);
+    expect(result.dailyRateOver).toBe(false);
+    expect(result.cardState).toBe('within');
+  });
 });
 
 describe('other per-item metrics', () => {

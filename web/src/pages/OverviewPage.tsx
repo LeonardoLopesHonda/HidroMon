@@ -10,6 +10,7 @@ import {
   daysElapsedInMonth,
   exceedanceChecks,
   horasOperadas,
+  isInMonth,
   measuredHoursPerDay,
   monthEndProjection,
   monthlyCap,
@@ -77,7 +78,11 @@ export function OverviewPage() {
 
   const now = currentMonth();
   const isCurrent = selectedMonth.year === now.year && selectedMonth.month === now.month;
-  const todayISO = new Date().toISOString().slice(0, 10);
+  // Local calendar date, not UTC — must agree with currentMonth()'s local
+  // getFullYear()/getMonth(), or the two can disagree for hours around UTC midnight
+  // (e.g. evenings in Brazil, UTC-3).
+  const today = new Date();
+  const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const monthBoundary = monthEndBoundary(selectedMonth.year, selectedMonth.month);
   // A past month is fully elapsed regardless of its actual calendar length (28-31
   // days) — the outorga's fixed 30-day accounting period is complete either way.
@@ -141,7 +146,7 @@ export function OverviewPage() {
                         const latestDailyRate = rateSeries.length > 0 ? rateSeries[rateSeries.length - 1].rate : null;
                         const dailyCap = item.limiteOutorgado != null ? item.limiteOutorgado * item.horasOperacao : 0;
 
-                        const hoursPerDaySeries = measuredHoursPerDay(readingsUpToMonth);
+                        const hoursPerDaySeries = item.hasHorimetro ? measuredHoursPerDay(readingsUpToMonth) : [];
                         const latestHoursPerDay =
                           hoursPerDaySeries.length > 0 ? hoursPerDaySeries[hoursPerDaySeries.length - 1].hoursPerDay : null;
 
@@ -178,15 +183,21 @@ export function OverviewPage() {
 
                       if (item.type === 'pluviometro') {
                         const monthTotalMm = itemReadings
-                          .filter((r) => r.date <= monthBoundary && r.date.slice(0, 7) === monthBoundary.slice(0, 7))
+                          .filter((r) => isInMonth(r.date, selectedMonth.year, selectedMonth.month))
                           .reduce((sum, r) => sum + (r.values.valor ?? 0), 0);
                         return (
                           <CompactCard key={item.id} type="pluviometro" itemName={item.name} monthTotalMm={monthTotalMm} />
                         );
                       }
 
-                      const latest =
-                        [...itemReadings].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))[0] ?? null;
+                      // Most recent reading as of the selected month (readings from later
+                      // months are excluded), matching the hidrometro/pluviometro cards
+                      // which all respect the MonthSelector rather than always showing the
+                      // true latest reading regardless of the selected month. itemReadings
+                      // isn't sorted, so find the max by date rather than assuming order.
+                      const latest = itemReadings
+                        .filter((r) => r.date <= monthBoundary)
+                        .reduce<Reading | null>((max, r) => (!max || r.date > max.date ? r : max), null);
                       return (
                         <CompactCard
                           key={item.id}
