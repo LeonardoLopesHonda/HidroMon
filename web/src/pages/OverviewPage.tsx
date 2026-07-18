@@ -142,11 +142,21 @@ export function OverviewPage() {
                         const cap = monthlyCap(item);
                         const projection = monthEndProjection(monthToDateConsumption, daysElapsed);
 
-                        const rateSeries = dailyRate(readingsUpToMonth);
+                        // Only a rate point dated within the selected month counts as
+                        // "current" — otherwise an item with no reading this month would
+                        // surface an exceedance badge computed from a stale, months-old
+                        // reading pair on an otherwise-empty ("within") card.
+                        const rateSeries = dailyRate(readingsUpToMonth).filter((p) =>
+                          isInMonth(p.date, selectedMonth.year, selectedMonth.month)
+                        );
                         const latestDailyRate = rateSeries.length > 0 ? rateSeries[rateSeries.length - 1].rate : null;
                         const dailyCap = item.limiteOutorgado != null ? item.limiteOutorgado * item.horasOperacao : 0;
 
-                        const hoursPerDaySeries = item.hasHorimetro ? measuredHoursPerDay(readingsUpToMonth) : [];
+                        const hoursPerDaySeries = item.hasHorimetro
+                          ? measuredHoursPerDay(readingsUpToMonth).filter((p) =>
+                              isInMonth(p.date, selectedMonth.year, selectedMonth.month)
+                            )
+                          : [];
                         const latestHoursPerDay =
                           hoursPerDaySeries.length > 0 ? hoursPerDaySeries[hoursPerDaySeries.length - 1].hoursPerDay : null;
 
@@ -163,7 +173,11 @@ export function OverviewPage() {
                         const monthHoras = item.hasHorimetro
                           ? horasOperadas(itemReadings, selectedMonth.year, selectedMonth.month)
                           : null;
-                        const vazaoSeries = item.hasHorimetro ? vazaoEfetivaHorimetro(readingsUpToMonth) : [];
+                        const vazaoSeries = item.hasHorimetro
+                          ? vazaoEfetivaHorimetro(readingsUpToMonth).filter((p) =>
+                              isInMonth(p.date, selectedMonth.year, selectedMonth.month)
+                            )
+                          : [];
                         const latestVazaoEfetiva = vazaoSeries.length > 0 ? vazaoSeries[vazaoSeries.length - 1].vazao : null;
 
                         return (
