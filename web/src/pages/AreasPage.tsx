@@ -3,6 +3,7 @@ import { getAreas, getItems, getReadings } from '@/lib/api/resources';
 import { ApiError } from '@/lib/api/client';
 import { AppHeader } from '@/components/AppHeader';
 import { Badge } from '@/components/ui/Badge';
+import { formatDateBR } from '@/lib/format';
 import type { Area, MonitoredItem, MonitoringType, Reading } from '@/types';
 
 const TYPE_LABELS: Record<MonitoringType, string> = {
@@ -10,11 +11,6 @@ const TYPE_LABELS: Record<MonitoringType, string> = {
   pluviometro: 'Pluviômetro',
   corrego: 'Córrego',
 };
-
-function formatDateBR(isoDate: string): string {
-  const [year, month, day] = isoDate.split('-');
-  return `${day}/${month}/${year}`;
-}
 
 function latestReadingDate(readings: Reading[], itemId: string): string | null {
   const dates = readings.filter((r) => r.itemId === itemId).map((r) => r.date);

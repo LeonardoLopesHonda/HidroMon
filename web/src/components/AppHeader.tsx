@@ -1,8 +1,14 @@
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 
 function initialsFromEmail(email: string): string {
   return email.slice(0, 2).toUpperCase();
 }
+
+const NAV_LINKS = [
+  { to: '/', label: 'Visão Geral' },
+  { to: '/areas', label: 'Áreas' },
+];
 
 export function AppHeader() {
   const { session, logout } = useAuth();
@@ -42,6 +48,25 @@ export function AppHeader() {
             Monitoramento hídrico
           </div>
         </div>
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 18 }}>
+          {NAV_LINKS.map((link) => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              end={link.to === '/'}
+              style={({ isActive }) => ({
+                padding: '6px 12px',
+                borderRadius: 7,
+                font: '600 12.5px var(--font-sans)',
+                color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                background: isActive ? 'var(--color-accent-bg)' : 'transparent',
+                textDecoration: 'none',
+              })}
+            >
+              {link.label}
+            </NavLink>
+          ))}
+        </nav>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <span style={{ font: '400 10px var(--font-sans)', color: 'var(--color-text-faintest)' }}>
