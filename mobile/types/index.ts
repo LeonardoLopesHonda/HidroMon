@@ -56,7 +56,7 @@ export interface ReadingStats {
   diasSemLeitura: number | null; // null for weekly-cadence areas
   horasOperadas: number | null; // last − first horímetro of month; null unless hasHorimetro
   limiteOutorgado: number;
-  monthlyCap: number; // limiteOutorgado × horasOperacao × daysInMonth; 0 when not applicable
+  monthlyCap: number; // limiteOutorgado × horasOperacao × 30 (fixed 30-day month per outorga); 0 when not applicable
   unit: string;
   primaryKey: string;
 }

@@ -1,0 +1,82 @@
+import { useAuth } from '@/context/AuthContext';
+
+function initialsFromEmail(email: string): string {
+  return email.slice(0, 2).toUpperCase();
+}
+
+export function AppHeader() {
+  const { session, logout } = useAuth();
+  const email = session?.user.email ?? '';
+
+  return (
+    <header
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        height: 62,
+        padding: '0 28px',
+        background: 'var(--color-surface)',
+        borderBottom: '1px solid var(--color-border)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 7,
+            background: 'var(--color-accent)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            font: '700 13px var(--font-mono)',
+          }}
+        >
+          H
+        </div>
+        <div>
+          <div style={{ font: '600 15px var(--font-sans)', color: 'var(--color-text)' }}>HidroMon</div>
+          <div style={{ font: '400 11px var(--font-sans)', color: 'var(--color-text-faint)' }}>
+            Monitoramento hídrico
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <span style={{ font: '400 10px var(--font-sans)', color: 'var(--color-text-faintest)' }}>
+          Fornecido por Telos Systems
+        </span>
+        <div
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: '50%',
+            background: 'var(--color-accent-bg)',
+            color: 'var(--color-accent)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            font: '600 11px var(--font-sans)',
+          }}
+        >
+          {initialsFromEmail(email)}
+        </div>
+        <span style={{ font: '400 12.5px var(--font-sans)', color: 'var(--color-text-muted)' }}>{email}</span>
+        <button
+          onClick={logout}
+          style={{
+            padding: '7px 14px',
+            borderRadius: 8,
+            border: '1px solid var(--color-border-input)',
+            background: 'var(--color-surface)',
+            color: 'var(--color-danger-text)',
+            font: '600 12.5px var(--font-sans)',
+          }}
+        >
+          Sair
+        </button>
+      </div>
+    </header>
+  );
+}
