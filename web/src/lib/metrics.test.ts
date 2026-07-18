@@ -9,6 +9,7 @@ import {
   monthEndProjection,
   monthlyCap,
   monthlyConsumption,
+  nextMonthStartISO,
   vazaoEfetivaHorimetro,
   vazaoMediaOutorga,
 } from '@/lib/metrics';
@@ -95,6 +96,16 @@ describe('daysElapsedInMonth', () => {
 
   it('caps at 30 even in a 31-day month', () => {
     expect(daysElapsedInMonth(2026, 7, '2026-07-31')).toBe(30);
+  });
+});
+
+describe('nextMonthStartISO', () => {
+  it('rolls over to January of the following year after December', () => {
+    expect(nextMonthStartISO(2026, 12)).toBe('2027-01-01');
+  });
+
+  it('advances to the next month within the same year', () => {
+    expect(nextMonthStartISO(2026, 7)).toBe('2026-08-01');
   });
 });
 

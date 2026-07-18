@@ -17,6 +17,10 @@ export function monthStartISO(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, '0')}-01`;
 }
 
+export function nextMonthStartISO(year: number, month: number): string {
+  return month === 12 ? monthStartISO(year + 1, 1) : monthStartISO(year, month + 1);
+}
+
 export function isInMonth(isoDate: string, year: number, month: number): boolean {
   const [y, m] = isoDate.split('-').map(Number);
   return y === year && m === month;

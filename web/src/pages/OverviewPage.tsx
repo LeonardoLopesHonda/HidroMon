@@ -15,14 +15,10 @@ import {
   monthEndProjection,
   monthlyCap,
   monthlyConsumption,
+  nextMonthStartISO,
   vazaoEfetivaHorimetro,
 } from '@/lib/metrics';
 import type { Area, MonitoredItem, Reading } from '@/types';
-
-/** Not necessarily a valid calendar date (e.g. "2026-02-31") — only used as an ISO-string upper bound, which is safe since zero-padded ISO dates compare lexicographically in date order. */
-function monthEndBoundary(year: number, month: number): string {
-  return `${year}-${String(month).padStart(2, '0')}-31`;
-}
 
 export function OverviewPage() {
   const [areas, setAreas] = useState<Area[]>([]);
@@ -76,18 +72,16 @@ export function OverviewPage() {
     return map;
   }, [items]);
 
-  const now = currentMonth();
-  const isCurrent = selectedMonth.year === now.year && selectedMonth.month === now.month;
   // Local calendar date, not UTC — must agree with currentMonth()'s local
   // getFullYear()/getMonth(), or the two can disagree for hours around UTC midnight
   // (e.g. evenings in Brazil, UTC-3).
   const today = new Date();
   const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  const monthBoundary = monthEndBoundary(selectedMonth.year, selectedMonth.month);
-  // A past month is fully elapsed regardless of its actual calendar length (28-31
-  // days) — the outorga's fixed 30-day accounting period is complete either way.
-  // Only the in-progress current month needs the real elapsed-day count.
-  const daysElapsed = isCurrent ? daysElapsedInMonth(selectedMonth.year, selectedMonth.month, todayISO) : 30;
+  const monthBoundary = nextMonthStartISO(selectedMonth.year, selectedMonth.month);
+  // For a past month, todayISO is already well past its end, so this clamps to the
+  // full fixed 30-day period on its own — no separate "is this the current month"
+  // branch needed.
+  const daysElapsed = daysElapsedInMonth(selectedMonth.year, selectedMonth.month, todayISO);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -133,7 +127,7 @@ export function OverviewPage() {
                       const itemReadings = readingsByItem.get(item.id) ?? [];
 
                       if (item.type === 'hidrometro') {
-                        const readingsUpToMonth = itemReadings.filter((r) => r.date <= monthBoundary);
+                        const readingsUpToMonth = itemReadings.filter((r) => r.date < monthBoundary);
                         const monthToDateConsumption = monthlyConsumption(
                           itemReadings,
                           selectedMonth.year,
@@ -210,7 +204,7 @@ export function OverviewPage() {
                       // true latest reading regardless of the selected month. itemReadings
                       // isn't sorted, so find the max by date rather than assuming order.
                       const latest = itemReadings
-                        .filter((r) => r.date <= monthBoundary)
+                        .filter((r) => r.date < monthBoundary)
                         .reduce<Reading | null>((max, r) => (!max || r.date > max.date ? r : max), null);
                       return (
                         <CompactCard
