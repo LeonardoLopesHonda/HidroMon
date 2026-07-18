@@ -67,6 +67,9 @@ def update_reading(
         return None
     item = _fetch_item(db, reading.item_id)
     valor, horimetro, nivel, vazao, raw_values = _derive(item, data.values)
+    if horimetro is None and reading.horimetro is not None:
+        # Sticky horímetro (ADR 0009): a blank incoming value never erases a stored one.
+        horimetro = float(reading.horimetro)
     _assert_monotonic(
         db, item, valor, horimetro, reading.date, reading.recorded_at, exclude_id=reading.id
     )
