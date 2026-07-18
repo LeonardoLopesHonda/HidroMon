@@ -72,7 +72,14 @@ def item(db_session):
     item = _item(area.id)
     db_session.add(item)
     db_session.flush()
-    return item
+    yield item
+    # update_reading commits internally, so the fixture's rollback can't undo
+    # these rows — delete them explicitly to keep the shared test DB clean.
+    db_session.rollback()
+    db_session.query(Reading).filter(Reading.item_id == item.id).delete()
+    db_session.query(MonitoredItem).filter(MonitoredItem.id == item.id).delete()
+    db_session.query(Area).filter(Area.id == area.id).delete()
+    db_session.commit()
 
 
 def _update(db_session, reading, *, valor=None, horimetro=None, observacoes=None):
@@ -157,3 +164,19 @@ def test_non_horimetro_fields_remain_last_write_wins(db_session, item):
     db_session.refresh(reading)
     assert float(reading.valor) == 101.0
     assert reading.observacoes == "editado"
+
+
+def test_sticky_restore_is_not_re_validated_against_bounds(db_session, item):
+    # Simulates pre-existing inconsistent data (e.g. from a direct migration/seed
+    # write that bypassed the service layer): an earlier reading with a higher
+    # horímetro than a later one.
+    earlier = _reading(item.id, day_offset=0, valor=100.0, horimetro=100.0)
+    target = _reading(item.id, day_offset=1, valor=105.0, horimetro=50.0, observacoes="original")
+    db_session.add_all([earlier, target])
+    db_session.flush()
+
+    _update(db_session, target, valor=105.0, horimetro=None, observacoes="editado")
+
+    db_session.refresh(target)
+    assert float(target.horimetro) == 50.0
+    assert target.observacoes == "editado"
