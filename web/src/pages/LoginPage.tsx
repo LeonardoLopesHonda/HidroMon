@@ -30,6 +30,8 @@ export function LoginPage() {
         justifyContent: 'center',
         flexDirection: 'column',
         gap: 22,
+        padding: '0 16px',
+        boxSizing: 'border-box',
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
@@ -59,7 +61,8 @@ export function LoginPage() {
       <form
         onSubmit={handleSubmit}
         style={{
-          width: 380,
+          width: '100%',
+          maxWidth: 380,
           background: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
           borderRadius: 12,

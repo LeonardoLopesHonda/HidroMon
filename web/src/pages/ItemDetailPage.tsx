@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getAreas, getItems, getReadings } from '@/lib/api/resources';
 import { ApiError } from '@/lib/api/client';
-import { AppHeader } from '@/components/AppHeader';
+import { PageShell } from '@/components/PageShell';
 import { Badge } from '@/components/ui/Badge';
 import { DurhOutorgaInfo } from '@/components/item-detail/DurhOutorgaInfo';
 import { HidrometroDetail } from '@/components/item-detail/HidrometroDetail';
@@ -58,51 +58,48 @@ export function ItemDetailPage() {
   }, []);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-      <AppHeader />
-      <main style={{ padding: '26px 28px 60px', maxWidth: 1200, margin: '0 auto' }}>
-        <Link
-          to="/areas"
-          style={{ display: 'inline-block', marginBottom: 16, font: '600 12.5px var(--font-sans)', color: 'var(--color-text-muted)', textDecoration: 'none' }}
-        >
-          ‹ Áreas
-        </Link>
+    <PageShell>
+      <Link
+        to="/areas"
+        style={{ display: 'inline-block', marginBottom: 16, font: '600 12.5px var(--font-sans)', color: 'var(--color-text-muted)', textDecoration: 'none' }}
+      >
+        ‹ Áreas
+      </Link>
 
-        {loading && <p style={{ font: '400 13px var(--font-sans)', color: 'var(--color-text-muted)' }}>Carregando…</p>}
-        {error && <p style={{ font: '400 13px var(--font-sans)', color: 'var(--color-danger-text)' }}>{error}</p>}
-        {!loading && !error && !item && (
-          <p style={{ font: '400 13px var(--font-sans)', color: 'var(--color-text-muted)' }}>Item não encontrado.</p>
-        )}
+      {loading && <p style={{ font: '400 13px var(--font-sans)', color: 'var(--color-text-muted)' }}>Carregando…</p>}
+      {error && <p style={{ font: '400 13px var(--font-sans)', color: 'var(--color-danger-text)' }}>{error}</p>}
+      {!loading && !error && !item && (
+        <p style={{ font: '400 13px var(--font-sans)', color: 'var(--color-text-muted)' }}>Item não encontrado.</p>
+      )}
 
-        {!loading && !error && item && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <h1 style={{ margin: 0, font: '600 19px var(--font-sans)', color: 'var(--color-text)' }}>{item.name}</h1>
-                  <Badge variant="info">{TYPE_LABELS[item.type]}</Badge>
-                  {item.disabled && <Badge variant="disabled">Desativado</Badge>}
-                </div>
-                {area && <span style={{ font: '400 12.5px var(--font-sans)', color: 'var(--color-text-faint)' }}>{area.name}</span>}
-                <DurhOutorgaInfo item={item} />
+      {!loading && !error && item && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <h1 style={{ margin: 0, font: '600 19px var(--font-sans)', color: 'var(--color-text)' }}>{item.name}</h1>
+                <Badge variant="info">{TYPE_LABELS[item.type]}</Badge>
+                {item.disabled && <Badge variant="disabled">Desativado</Badge>}
               </div>
-              <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
+              {area && <span style={{ font: '400 12.5px var(--font-sans)', color: 'var(--color-text-faint)' }}>{area.name}</span>}
+              <DurhOutorgaInfo item={item} />
             </div>
-
-            {item.type === 'hidrometro' && (
-              <HidrometroDetail
-                key={item.id}
-                item={item}
-                readings={itemReadings}
-                selectedMonth={selectedMonth}
-                onReadingUpdated={handleReadingUpdated}
-              />
-            )}
-            {item.type === 'pluviometro' && <PluviometroDetail key={item.id} readings={itemReadings} selectedMonth={selectedMonth} />}
-            {item.type === 'corrego' && <CorregoDetail key={item.id} item={item} readings={itemReadings} selectedMonth={selectedMonth} />}
+            <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
           </div>
-        )}
-      </main>
-    </div>
+
+          {item.type === 'hidrometro' && (
+            <HidrometroDetail
+              key={item.id}
+              item={item}
+              readings={itemReadings}
+              selectedMonth={selectedMonth}
+              onReadingUpdated={handleReadingUpdated}
+            />
+          )}
+          {item.type === 'pluviometro' && <PluviometroDetail key={item.id} readings={itemReadings} selectedMonth={selectedMonth} />}
+          {item.type === 'corrego' && <CorregoDetail key={item.id} item={item} readings={itemReadings} selectedMonth={selectedMonth} />}
+        </div>
+      )}
+    </PageShell>
   );
 }

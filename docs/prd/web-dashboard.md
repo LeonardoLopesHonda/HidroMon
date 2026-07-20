@@ -63,7 +63,7 @@ Per-type content:
 - No editing/deleting readings from the web (mobile remains the correction surface); the only write is horímetro backfill.
 - No reports for pluviômetro/córrego (no IMASUL cell for them; future templates can reuse the generator pattern).
 - No automated alerts, no roles/permissions, no offline support (the web app assumes connectivity).
-- No mobile-responsive layout beyond basic usability — desktop-first.
+- No phone-width (~375–430px) layout — deferred to a follow-up milestone. Tablet-width (768–1024px) is supported (issue #19) via a shared `useBreakpoint` hook and `PageShell` component, except the horímetro backfill grid, which stays desktop-only.
 
 ## Open Items
 
