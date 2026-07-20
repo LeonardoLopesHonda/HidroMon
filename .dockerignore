@@ -1,0 +1,6 @@
+mobile/
+web/
+.git/
+**/__pycache__/
+**/.venv/
+**/node_modules/
