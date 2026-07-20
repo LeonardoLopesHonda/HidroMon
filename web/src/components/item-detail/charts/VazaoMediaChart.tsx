@@ -1,23 +1,10 @@
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import type { VazaoEfetivaPoint } from '@/lib/metrics';
+import { mergeSeriesByDate, type VazaoEfetivaPoint } from '@/lib/metrics';
 import { formatDateBR, formatNumberBR } from '@/lib/format';
 import { axisTick, emptyChartStyle, tooltipContentStyle } from '@/components/item-detail/charts/chartStyles';
 
-interface MergedPoint {
-  date: string;
-  vazaoMedia: number | null;
-  vazaoEfetiva: number | null;
-}
-
-function mergeByDate(a: VazaoEfetivaPoint[], b: VazaoEfetivaPoint[]): MergedPoint[] {
-  const dates = Array.from(new Set([...a.map((p) => p.date), ...b.map((p) => p.date)])).sort();
-  const aByDate = new Map(a.map((p) => [p.date, p.vazao]));
-  const bByDate = new Map(b.map((p) => [p.date, p.vazao]));
-  return dates.map((date) => ({
-    date,
-    vazaoMedia: aByDate.get(date) ?? null,
-    vazaoEfetiva: bByDate.get(date) ?? null,
-  }));
+function mergeByDate(a: VazaoEfetivaPoint[], b: VazaoEfetivaPoint[]) {
+  return mergeSeriesByDate(a, b, (p) => p.vazao, (p) => p.vazao).map((p) => ({ date: p.date, vazaoMedia: p.a, vazaoEfetiva: p.b }));
 }
 
 export function VazaoMediaChart({

@@ -8,11 +8,10 @@ import { useHorimetroEditBuffer } from '@/components/item-detail/useHorimetroEdi
 import { TaxaDiariaChart } from '@/components/item-detail/charts/TaxaDiariaChart';
 import { VazaoMediaChart } from '@/components/item-detail/charts/VazaoMediaChart';
 import { CumulativeConsumptionChart } from '@/components/item-detail/charts/CumulativeConsumptionChart';
-import type { PrecipitationPoint } from '@/components/item-detail/charts/PrecipitationBarChart';
 import { STATE_LABEL } from '@/components/overview/ComplianceCard';
 import { sectionStyle, sectionTitleStyle } from '@/components/item-detail/sectionStyles';
 import type { SelectedMonth } from '@/components/shared/MonthSelector';
-import { hidrometroMonthStats, isInMonth, sortByDateAndRecordedAt } from '@/lib/metrics';
+import { dailyPrecipitationPoints, hidrometroMonthStats } from '@/lib/metrics';
 import { formatNumberBR, formatPercentBR } from '@/lib/format';
 import type { MonitoredItem, Reading } from '@/types';
 
@@ -47,14 +46,7 @@ export function HidrometroDetail({
   const editBuffer = useHorimetroEditBuffer(onReadingUpdated);
   const canGenerateReport = item.durhNumber != null && item.outorgaNumber != null;
 
-  const rainPoints: PrecipitationPoint[] = useMemo(
-    () =>
-      sortByDateAndRecordedAt(pluviometroReadings.filter((r) => isInMonth(r.date, year, month) && r.values.valor != null)).map((r) => ({
-        date: r.date,
-        mm: r.values.valor!,
-      })),
-    [pluviometroReadings, year, month],
-  );
+  const rainPoints = useMemo(() => dailyPrecipitationPoints(pluviometroReadings, year, month), [pluviometroReadings, year, month]);
 
   const rows = onlyMissingHours ? stats.monthReadings.filter((r) => r.values.horimetro == null) : stats.monthReadings;
   // Full item history, not just the selected month — a pending edit made in a

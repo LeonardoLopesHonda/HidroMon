@@ -1,20 +1,10 @@
 import { Bar, CartesianGrid, Cell, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import type { DailyRatePoint } from '@/lib/metrics';
-import type { PrecipitationPoint } from '@/components/item-detail/charts/PrecipitationBarChart';
+import { mergeSeriesByDate, type DailyRatePoint, type PrecipitationPoint } from '@/lib/metrics';
 import { formatDateBR, formatNumberBR } from '@/lib/format';
 import { axisTick, emptyChartStyle, tooltipContentStyle } from '@/components/item-detail/charts/chartStyles';
 
-interface MergedPoint {
-  date: string;
-  rate: number | null;
-  mm: number | null;
-}
-
-function mergeRain(points: DailyRatePoint[], rainPoints: PrecipitationPoint[]): MergedPoint[] {
-  const dates = Array.from(new Set([...points.map((p) => p.date), ...rainPoints.map((p) => p.date)])).sort();
-  const rateByDate = new Map(points.map((p) => [p.date, p.rate]));
-  const rainByDate = new Map(rainPoints.map((p) => [p.date, p.mm]));
-  return dates.map((date) => ({ date, rate: rateByDate.get(date) ?? null, mm: rainByDate.get(date) ?? null }));
+function mergeRain(points: DailyRatePoint[], rainPoints: PrecipitationPoint[]) {
+  return mergeSeriesByDate(points, rainPoints, (p) => p.rate, (p) => p.mm).map((p) => ({ date: p.date, rate: p.a, mm: p.b }));
 }
 
 export function TaxaDiariaChart({
