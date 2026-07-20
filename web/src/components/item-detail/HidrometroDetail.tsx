@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { ImasulReportDialog } from '@/components/item-detail/ImasulReportDialog';
 import { StatTile } from '@/components/item-detail/StatTile';
@@ -11,7 +11,7 @@ import { CumulativeConsumptionChart } from '@/components/item-detail/charts/Cumu
 import { STATE_LABEL } from '@/components/overview/ComplianceCard';
 import { sectionStyle, sectionTitleStyle } from '@/components/item-detail/sectionStyles';
 import type { SelectedMonth } from '@/components/shared/MonthSelector';
-import { hidrometroMonthStats } from '@/lib/metrics';
+import { dailyPrecipitationPoints, hidrometroMonthStats } from '@/lib/metrics';
 import { formatNumberBR, formatPercentBR } from '@/lib/format';
 import type { MonitoredItem, Reading } from '@/types';
 
@@ -25,11 +25,15 @@ export function HidrometroDetail({
   readings,
   selectedMonth,
   onReadingUpdated,
+  pluviometro,
+  pluviometroReadings,
 }: {
   item: MonitoredItem;
   readings: Reading[];
   selectedMonth: SelectedMonth;
   onReadingUpdated: (updated: Reading) => void;
+  pluviometro?: MonitoredItem;
+  pluviometroReadings: Reading[];
 }) {
   const { year, month } = selectedMonth;
   const stats = hidrometroMonthStats(item, readings, year, month, todayISO());
@@ -38,8 +42,11 @@ export function HidrometroDetail({
   const [onlyMissingHours, setOnlyMissingHours] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [showRain, setShowRain] = useState(false);
   const editBuffer = useHorimetroEditBuffer(onReadingUpdated);
   const canGenerateReport = item.durhNumber != null && item.outorgaNumber != null;
+
+  const rainPoints = useMemo(() => dailyPrecipitationPoints(pluviometroReadings, year, month), [pluviometroReadings, year, month]);
 
   const rows = onlyMissingHours ? stats.monthReadings.filter((r) => r.values.horimetro == null) : stats.monthReadings;
   // Full item history, not just the selected month — a pending edit made in a
@@ -115,8 +122,16 @@ export function HidrometroDetail({
       </div>
 
       <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Taxa diária</h3>
-        <TaxaDiariaChart points={stats.rateSeries} dailyCap={stats.dailyCap} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
+          <h3 style={{ ...sectionTitleStyle, margin: 0 }}>Taxa diária</h3>
+          {pluviometro && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, font: '400 12.5px var(--font-sans)', color: 'var(--color-text-muted)' }}>
+              <input type="checkbox" checked={showRain} onChange={(e) => setShowRain(e.target.checked)} />
+              Mostrar chuva
+            </label>
+          )}
+        </div>
+        <TaxaDiariaChart points={stats.rateSeries} dailyCap={stats.dailyCap} rainPoints={pluviometro ? rainPoints : undefined} showRain={showRain} />
       </div>
 
       <div style={sectionStyle}>

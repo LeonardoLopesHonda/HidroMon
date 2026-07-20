@@ -1,11 +1,7 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import type { PrecipitationPoint } from '@/lib/metrics';
 import { formatDateBR, formatNumberBR } from '@/lib/format';
 import { axisTick, emptyChartStyle, tooltipContentStyle } from '@/components/item-detail/charts/chartStyles';
-
-export interface PrecipitationPoint {
-  date: string;
-  mm: number;
-}
 
 export function PrecipitationBarChart({ points }: { points: PrecipitationPoint[] }) {
   if (points.length === 0) {

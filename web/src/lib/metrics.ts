@@ -191,6 +191,22 @@ export function sortByDateAndRecordedAt(readings: Reading[]): Reading[] {
   });
 }
 
+/**
+ * Unions the dates of two independent-cadence series, `null` where one side
+ * has no point — for overlaying series that aren't read on the same schedule.
+ */
+export function mergeSeriesByDate<A extends { date: string }, B extends { date: string }>(
+  seriesA: A[],
+  seriesB: B[],
+  valueA: (point: A) => number,
+  valueB: (point: B) => number,
+): { date: string; a: number | null; b: number | null }[] {
+  const dates = Array.from(new Set([...seriesA.map((p) => p.date), ...seriesB.map((p) => p.date)])).sort();
+  const aByDate = new Map(seriesA.map((p) => [p.date, valueA(p)]));
+  const bByDate = new Map(seriesB.map((p) => [p.date, valueB(p)]));
+  return dates.map((date) => ({ date, a: aByDate.get(date) ?? null, b: bByDate.get(date) ?? null }));
+}
+
 export interface HorimetroBounds {
   lower: number | null;
   upper: number | null;
@@ -358,6 +374,19 @@ export function hidrometroMonthStats(
     checks,
     monthHoras,
   };
+}
+
+export interface PrecipitationPoint {
+  date: string;
+  mm: number;
+}
+
+/** Daily precipitation for the given month, ordered by (date, recordedAt). */
+export function dailyPrecipitationPoints(readings: Reading[], year: number, month: number): PrecipitationPoint[] {
+  return sortByDateAndRecordedAt(readings.filter((r) => isInMonth(r.date, year, month) && r.values.valor != null)).map((r) => ({
+    date: r.date,
+    mm: r.values.valor!,
+  }));
 }
 
 export interface MonthlyPrecipitationPoint {

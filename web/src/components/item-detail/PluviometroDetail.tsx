@@ -1,10 +1,10 @@
 import { StatTile } from '@/components/item-detail/StatTile';
 import { ReadingHistoryTable, type ReadingHistoryColumn } from '@/components/item-detail/ReadingHistoryTable';
-import { PrecipitationBarChart, type PrecipitationPoint } from '@/components/item-detail/charts/PrecipitationBarChart';
+import { PrecipitationBarChart } from '@/components/item-detail/charts/PrecipitationBarChart';
 import { YearlyPrecipitationSummary } from '@/components/item-detail/charts/YearlyPrecipitationSummary';
 import { sectionStyle, sectionTitleStyle } from '@/components/item-detail/sectionStyles';
 import type { SelectedMonth } from '@/components/shared/MonthSelector';
-import { isInMonth, monthlyPrecipitationTotals, sortByDateAndRecordedAt } from '@/lib/metrics';
+import { dailyPrecipitationPoints, isInMonth, monthlyPrecipitationTotals } from '@/lib/metrics';
 import { formatNumberBR } from '@/lib/format';
 import type { Reading } from '@/types';
 
@@ -15,10 +15,7 @@ export function PluviometroDetail({ readings, selectedMonth }: { readings: Readi
   const yearlyTotals = monthlyPrecipitationTotals(readings, year);
   const monthTotal = yearlyTotals.find((p) => p.month === month) ?? { totalMm: 0, hasData: false };
 
-  const dailyPoints: PrecipitationPoint[] = sortByDateAndRecordedAt(monthReadings.filter((r) => r.values.valor != null)).map((r) => ({
-    date: r.date,
-    mm: r.values.valor!,
-  }));
+  const dailyPoints = dailyPrecipitationPoints(readings, year, month);
 
   const columns: ReadingHistoryColumn[] = [
     { key: 'valor', header: 'Precipitação (mm)', cell: (r) => (r.values.valor != null ? formatNumberBR(r.values.valor) : '—') },
