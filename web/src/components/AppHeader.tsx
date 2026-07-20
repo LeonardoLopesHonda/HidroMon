@@ -77,6 +77,7 @@ export function AppHeader() {
           </span>
         )}
         <div
+          title={email}
           style={{
             width: 30,
             height: 30,
