@@ -1,25 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import type { Reading } from '@/types';
 import {
+  cumulativeConsumptionSeries,
   daysElapsedInMonth,
   dailyRate,
   exceedanceChecks,
   horasOperadas,
+  horimetroBounds,
   measuredHoursPerDay,
   monthEndProjection,
   monthlyCap,
   monthlyConsumption,
+  monthlyPrecipitationTotals,
   nextMonthStartISO,
   vazaoEfetivaHorimetro,
   vazaoMediaOutorga,
+  vazaoMediaOutorgaSeries,
 } from '@/lib/metrics';
 
-function reading(date: string, valor?: number, horimetro?: number): Reading {
+function reading(date: string, valor?: number, horimetro?: number, recordedAt?: string): Reading {
   return {
-    id: `r-${date}-${valor ?? 'x'}-${horimetro ?? 'x'}`,
+    id: `r-${date}-${valor ?? 'x'}-${horimetro ?? 'x'}-${recordedAt ?? ''}`,
     itemId: 'item-1',
     date,
-    recordedAt: `${date}T12:00:00Z`,
+    recordedAt: recordedAt ?? `${date}T12:00:00Z`,
     values: { valor, horimetro },
     observacoes: null,
     createdBy: 'user-1',
@@ -205,5 +209,91 @@ describe('other per-item metrics', () => {
   it('horasOperadas is null when the month has no horímetro data', () => {
     const readings = [reading('2026-07-01', 1000)];
     expect(horasOperadas(readings, 2026, 7)).toBeNull();
+  });
+
+  it('vazaoMediaOutorgaSeries maps each dailyRate point through vazaoMediaOutorga', () => {
+    const readings = [reading('2026-07-01', 100), reading('2026-07-02', 130)];
+    expect(vazaoMediaOutorgaSeries(readings, 24)).toEqual([{ date: '2026-07-02', vazao: 30 / 24 }]);
+  });
+});
+
+describe('cumulativeConsumptionSeries', () => {
+  it('populates pace every day as a straight line from 0 to the cap', () => {
+    const points = cumulativeConsumptionSeries([], 2026, 7, 300);
+    expect(points).toHaveLength(30);
+    expect(points[0]).toMatchObject({ day: 1, pace: 10 });
+    expect(points[14]).toMatchObject({ day: 15, pace: 150 });
+    expect(points[29]).toMatchObject({ day: 30, pace: 300 });
+  });
+
+  it('populates cumulative only on days with an actual reading, using the monthlyConsumption baseline', () => {
+    const readings = [reading('2026-06-28', 900), reading('2026-07-05', 1000), reading('2026-07-20', 1050)];
+    const points = cumulativeConsumptionSeries(readings, 2026, 7, 300);
+    expect(points[4]).toMatchObject({ day: 5, date: '2026-07-05', cumulative: 100 });
+    expect(points[19]).toMatchObject({ day: 20, date: '2026-07-20', cumulative: 150 });
+    expect(points[9].cumulative).toBeNull(); // day 10 — no reading that day
+  });
+
+  it('leaves cumulative null throughout when the item has no baseline (start of history, no in-month reading either)', () => {
+    const points = cumulativeConsumptionSeries([], 2026, 7, 300);
+    expect(points.every((p) => p.cumulative === null)).toBe(true);
+  });
+});
+
+describe('monthlyPrecipitationTotals', () => {
+  it('sums (never deltas) daily mm per month', () => {
+    const readings = [reading('2026-07-01', 5), reading('2026-07-02', 8), reading('2026-08-01', 3)];
+    const points = monthlyPrecipitationTotals(readings, 2026);
+    expect(points[6]).toMatchObject({ month: 7, totalMm: 13, hasData: true }); // July
+    expect(points[7]).toMatchObject({ month: 8, totalMm: 3, hasData: true }); // August
+  });
+
+  it('distinguishes a month with no readings from a measured 0mm month', () => {
+    const readings = [reading('2026-07-01', 0)];
+    const points = monthlyPrecipitationTotals(readings, 2026);
+    expect(points[6]).toMatchObject({ month: 7, totalMm: 0, hasData: true });
+    expect(points[8]).toMatchObject({ month: 9, totalMm: 0, hasData: false });
+  });
+});
+
+describe('horimetroBounds', () => {
+  it('finds the nearest earlier/later readings with hours, skipping blanks', () => {
+    const target = reading('2026-07-10', 1040);
+    const readings = [
+      reading('2026-07-01', 1000, 500),
+      reading('2026-07-05', 1020), // blank horímetro — skipped
+      target,
+      reading('2026-07-15', 1060), // blank horímetro — skipped
+      reading('2026-07-20', 1080, 560),
+    ];
+    expect(horimetroBounds(readings, target.id)).toEqual({ lower: 500, upper: 560 });
+  });
+
+  it('breaks same-day ties using recordedAt, matching the server ordering', () => {
+    const target = reading('2026-07-10', 1040, undefined, '2026-07-10T12:00:00Z');
+    const readings = [
+      reading('2026-07-10', 1030, 510, '2026-07-10T08:00:00Z'), // earlier same day
+      target,
+      reading('2026-07-10', 1050, 520, '2026-07-10T18:00:00Z'), // later same day
+    ];
+    expect(horimetroBounds(readings, target.id)).toEqual({ lower: 510, upper: 520 });
+  });
+
+  it('has no lower bound at the start of horímetro history', () => {
+    const target = reading('2026-07-01', 1000, 500);
+    const readings = [target, reading('2026-07-10', 1040, 540)];
+    expect(horimetroBounds(readings, target.id)).toEqual({ lower: null, upper: 540 });
+  });
+
+  it('has no upper bound at the end of horímetro history', () => {
+    const target = reading('2026-07-20', 1040, 540);
+    const readings = [reading('2026-07-01', 1000, 500), target];
+    expect(horimetroBounds(readings, target.id)).toEqual({ lower: 500, upper: null });
+  });
+
+  it("excludes the target reading's own value from its bounds", () => {
+    const target = reading('2026-07-10', 1040, 530);
+    const readings = [reading('2026-07-01', 1000, 500), target, reading('2026-07-20', 1080, 560)];
+    expect(horimetroBounds(readings, target.id)).toEqual({ lower: 500, upper: 560 });
   });
 });

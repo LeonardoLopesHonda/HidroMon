@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getAreas, getItems, getReadings } from '@/lib/api/resources';
 import { ApiError } from '@/lib/api/client';
 import { AppHeader } from '@/components/AppHeader';
-import { MonthSelector, currentMonth, type SelectedMonth } from '@/components/overview/MonthSelector';
+import { MonthSelector, currentMonth, type SelectedMonth } from '@/components/shared/MonthSelector';
 import { ComplianceCard } from '@/components/overview/ComplianceCard';
 import { CompactCard } from '@/components/overview/CompactCard';
 import {
