@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 if (!BASE_URL) {
   throw new Error('Missing VITE_API_BASE_URL. Check web/.env.');
 }
@@ -19,7 +19,7 @@ export class ApiError extends Error {
 
 type QueryParams = Record<string, string | number | undefined>;
 
-async function authHeader(): Promise<Record<string, string>> {
+export async function authHeader(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   return token ? { Authorization: `Bearer ${token}` } : {};
