@@ -6,6 +6,8 @@ import { AppHeader } from '@/components/AppHeader';
 import { Badge } from '@/components/ui/Badge';
 import { DurhOutorgaInfo } from '@/components/item-detail/DurhOutorgaInfo';
 import { HidrometroDetail } from '@/components/item-detail/HidrometroDetail';
+import { PluviometroDetail } from '@/components/item-detail/PluviometroDetail';
+import { CorregoDetail } from '@/components/item-detail/CorregoDetail';
 import { MonthSelector, currentMonth, type SelectedMonth } from '@/components/shared/MonthSelector';
 import type { Area, MonitoredItem, MonitoringType, Reading } from '@/types';
 
@@ -96,6 +98,8 @@ export function ItemDetailPage() {
                 onReadingUpdated={handleReadingUpdated}
               />
             )}
+            {item.type === 'pluviometro' && <PluviometroDetail key={item.id} readings={itemReadings} selectedMonth={selectedMonth} />}
+            {item.type === 'corrego' && <CorregoDetail key={item.id} item={item} readings={itemReadings} selectedMonth={selectedMonth} />}
           </div>
         )}
       </main>

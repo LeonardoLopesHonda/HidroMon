@@ -8,23 +8,11 @@ import { TaxaDiariaChart } from '@/components/item-detail/charts/TaxaDiariaChart
 import { VazaoMediaChart } from '@/components/item-detail/charts/VazaoMediaChart';
 import { CumulativeConsumptionChart } from '@/components/item-detail/charts/CumulativeConsumptionChart';
 import { STATE_LABEL } from '@/components/overview/ComplianceCard';
+import { sectionStyle, sectionTitleStyle } from '@/components/item-detail/sectionStyles';
 import type { SelectedMonth } from '@/components/shared/MonthSelector';
 import { hidrometroMonthStats } from '@/lib/metrics';
 import { formatNumberBR, formatPercentBR } from '@/lib/format';
 import type { MonitoredItem, Reading } from '@/types';
-
-const sectionStyle = {
-  background: 'var(--color-surface)',
-  border: '1px solid var(--color-border)',
-  borderRadius: 10,
-  padding: '18px 20px',
-};
-
-const sectionTitleStyle = {
-  margin: '0 0 14px',
-  font: '600 13px var(--font-sans)',
-  color: 'var(--color-text)',
-};
 
 function todayISO(): string {
   const now = new Date();
