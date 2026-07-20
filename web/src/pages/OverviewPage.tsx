@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getAreas, getItems, getReadings } from '@/lib/api/resources';
 import { ApiError } from '@/lib/api/client';
-import { AppHeader } from '@/components/AppHeader';
+import { PageShell } from '@/components/PageShell';
 import { MonthSelector, currentMonth, type SelectedMonth } from '@/components/shared/MonthSelector';
 import { ComplianceCard } from '@/components/overview/ComplianceCard';
 import { CompactCard } from '@/components/overview/CompactCard';
@@ -68,101 +68,98 @@ export function OverviewPage() {
   const monthBoundary = nextMonthStartISO(selectedMonth.year, selectedMonth.month);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-      <AppHeader />
-      <main style={{ padding: '26px 28px 60px', maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
-          <h1 style={{ margin: 0, font: '600 18px var(--font-sans)', color: 'var(--color-text)' }}>Visão Geral</h1>
-          <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
-        </div>
+    <PageShell>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 22 }}>
+        <h1 style={{ margin: 0, font: '600 18px var(--font-sans)', color: 'var(--color-text)' }}>Visão Geral</h1>
+        <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
+      </div>
 
-        {loading && (
-          <p style={{ font: '400 13px var(--font-sans)', color: 'var(--color-text-muted)' }}>Carregando…</p>
-        )}
-        {error && <p style={{ font: '400 13px var(--font-sans)', color: 'var(--color-danger-text)' }}>{error}</p>}
+      {loading && (
+        <p style={{ font: '400 13px var(--font-sans)', color: 'var(--color-text-muted)' }}>Carregando…</p>
+      )}
+      {error && <p style={{ font: '400 13px var(--font-sans)', color: 'var(--color-danger-text)' }}>{error}</p>}
 
-        {!loading && !error && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>
-            {areas.map((area) => {
-              const areaItems = itemsByArea.get(area.id) ?? [];
-              if (areaItems.length === 0) return null;
+      {!loading && !error && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>
+          {areas.map((area) => {
+            const areaItems = itemsByArea.get(area.id) ?? [];
+            if (areaItems.length === 0) return null;
 
-              return (
-                <section key={area.id}>
-                  <h2
-                    style={{
-                      margin: '0 0 12px',
-                      font: '600 12px var(--font-sans)',
-                      color: 'var(--color-text-muted)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '.07em',
-                    }}
-                  >
-                    {area.name}
-                  </h2>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                      gap: 14,
-                    }}
-                  >
-                    {areaItems.map((item) => {
-                      const itemReadings = readingsByItem.get(item.id) ?? [];
+            return (
+              <section key={area.id}>
+                <h2
+                  style={{
+                    margin: '0 0 12px',
+                    font: '600 12px var(--font-sans)',
+                    color: 'var(--color-text-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '.07em',
+                  }}
+                >
+                  {area.name}
+                </h2>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: 14,
+                  }}
+                >
+                  {areaItems.map((item) => {
+                    const itemReadings = readingsByItem.get(item.id) ?? [];
 
-                      if (item.type === 'hidrometro') {
-                        const stats = hidrometroMonthStats(item, itemReadings, selectedMonth.year, selectedMonth.month, todayISO);
+                    if (item.type === 'hidrometro') {
+                      const stats = hidrometroMonthStats(item, itemReadings, selectedMonth.year, selectedMonth.month, todayISO);
 
-                        return (
-                          <ComplianceCard
-                            key={item.id}
-                            itemName={item.name}
-                            monthToDateConsumption={stats.monthToDateConsumption}
-                            cap={stats.cap}
-                            projection={stats.projection}
-                            checks={stats.checks}
-                            horasOperadas={stats.monthHoras}
-                            vazaoEfetiva={stats.latestVazaoEfetiva}
-                            horasOperacao={item.horasOperacao}
-                          />
-                        );
-                      }
-
-                      if (item.type === 'pluviometro') {
-                        const monthTotalMm = itemReadings
-                          .filter((r) => isInMonth(r.date, selectedMonth.year, selectedMonth.month))
-                          .reduce((sum, r) => sum + (r.values.valor ?? 0), 0);
-                        return (
-                          <CompactCard key={item.id} type="pluviometro" itemName={item.name} monthTotalMm={monthTotalMm} />
-                        );
-                      }
-
-                      // Most recent reading as of the selected month (readings from later
-                      // months are excluded), matching the hidrometro/pluviometro cards
-                      // which all respect the MonthSelector rather than always showing the
-                      // true latest reading regardless of the selected month. itemReadings
-                      // isn't sorted, so find the max by date rather than assuming order.
-                      const latest = itemReadings
-                        .filter((r) => r.date < monthBoundary)
-                        .reduce<Reading | null>((max, r) => (!max || r.date > max.date ? r : max), null);
                       return (
-                        <CompactCard
+                        <ComplianceCard
                           key={item.id}
-                          type="corrego"
                           itemName={item.name}
-                          latestDate={latest?.date ?? null}
-                          latestNivel={latest?.values.nivel ?? null}
-                          latestVazao={latest?.values.vazao ?? null}
+                          monthToDateConsumption={stats.monthToDateConsumption}
+                          cap={stats.cap}
+                          projection={stats.projection}
+                          checks={stats.checks}
+                          horasOperadas={stats.monthHoras}
+                          vazaoEfetiva={stats.latestVazaoEfetiva}
+                          horasOperacao={item.horasOperacao}
                         />
                       );
-                    })}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-        )}
-      </main>
-    </div>
+                    }
+
+                    if (item.type === 'pluviometro') {
+                      const monthTotalMm = itemReadings
+                        .filter((r) => isInMonth(r.date, selectedMonth.year, selectedMonth.month))
+                        .reduce((sum, r) => sum + (r.values.valor ?? 0), 0);
+                      return (
+                        <CompactCard key={item.id} type="pluviometro" itemName={item.name} monthTotalMm={monthTotalMm} />
+                      );
+                    }
+
+                    // Most recent reading as of the selected month (readings from later
+                    // months are excluded), matching the hidrometro/pluviometro cards
+                    // which all respect the MonthSelector rather than always showing the
+                    // true latest reading regardless of the selected month. itemReadings
+                    // isn't sorted, so find the max by date rather than assuming order.
+                    const latest = itemReadings
+                      .filter((r) => r.date < monthBoundary)
+                      .reduce<Reading | null>((max, r) => (!max || r.date > max.date ? r : max), null);
+                    return (
+                      <CompactCard
+                        key={item.id}
+                        type="corrego"
+                        itemName={item.name}
+                        latestDate={latest?.date ?? null}
+                        latestNivel={latest?.values.nivel ?? null}
+                        latestVazao={latest?.values.vazao ?? null}
+                      />
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
+    </PageShell>
   );
 }

@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useBreakpoint } from '@/lib/useBreakpoint';
 
 function initialsFromEmail(email: string): string {
   return email.slice(0, 2).toUpperCase();
@@ -13,6 +14,7 @@ const NAV_LINKS = [
 export function AppHeader() {
   const { session, logout } = useAuth();
   const email = session?.user.email ?? '';
+  const tier = useBreakpoint();
 
   return (
     <header
@@ -69,9 +71,11 @@ export function AppHeader() {
         </nav>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <span style={{ font: '400 10px var(--font-sans)', color: 'var(--color-text-faintest)' }}>
-          Fornecido por Telos Systems
-        </span>
+        {tier === 'desktop' && (
+          <span style={{ font: '400 10px var(--font-sans)', color: 'var(--color-text-faintest)' }}>
+            Fornecido por Telos Systems
+          </span>
+        )}
         <div
           style={{
             width: 30,
@@ -87,7 +91,9 @@ export function AppHeader() {
         >
           {initialsFromEmail(email)}
         </div>
-        <span style={{ font: '400 12.5px var(--font-sans)', color: 'var(--color-text-muted)' }}>{email}</span>
+        {tier === 'desktop' && (
+          <span style={{ font: '400 12.5px var(--font-sans)', color: 'var(--color-text-muted)' }}>{email}</span>
+        )}
         <button
           onClick={logout}
           style={{
