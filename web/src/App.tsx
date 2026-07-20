@@ -4,6 +4,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { LoginPage } from '@/pages/LoginPage';
 import { OverviewPage } from '@/pages/OverviewPage';
 import { AreasPage } from '@/pages/AreasPage';
+import { ItemDetailPage } from '@/pages/ItemDetailPage';
 
 function App() {
   return (
@@ -24,6 +25,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <AreasPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/items/:itemId"
+            element={
+              <ProtectedRoute>
+                <ItemDetailPage />
               </ProtectedRoute>
             }
           />
