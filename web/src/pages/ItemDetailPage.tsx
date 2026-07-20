@@ -88,7 +88,13 @@ export function ItemDetailPage() {
             </div>
 
             {item.type === 'hidrometro' && (
-              <HidrometroDetail item={item} readings={itemReadings} selectedMonth={selectedMonth} onReadingUpdated={handleReadingUpdated} />
+              <HidrometroDetail
+                key={item.id}
+                item={item}
+                readings={itemReadings}
+                selectedMonth={selectedMonth}
+                onReadingUpdated={handleReadingUpdated}
+              />
             )}
           </div>
         )}

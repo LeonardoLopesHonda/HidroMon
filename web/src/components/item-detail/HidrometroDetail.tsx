@@ -51,7 +51,9 @@ export function HidrometroDetail({
   const editBuffer = useHorimetroEditBuffer(onReadingUpdated);
 
   const rows = onlyMissingHours ? stats.monthReadings.filter((r) => r.values.horimetro == null) : stats.monthReadings;
-  const pendingCount = stats.monthReadings.filter((r) => editBuffer.isDirty(r)).length;
+  // Full item history, not just the selected month — a pending edit made in a
+  // different month must still count (and still block/save) even while it's off-screen.
+  const pendingCount = readings.filter((r) => editBuffer.isDirty(r)).length;
 
   const handleSave = async () => {
     setSaving(true);

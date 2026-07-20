@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { updateReading } from '@/lib/api/resources';
 import { ApiError } from '@/lib/api/client';
 import { horimetroBounds, sortByDateAndRecordedAt } from '@/lib/metrics';
@@ -18,7 +18,8 @@ function cleanState(reading: Reading): HorimetroRowState {
 
 function errorDetail(err: unknown): string {
   if (err instanceof ApiError && err.body && typeof err.body === 'object' && 'detail' in err.body) {
-    return String((err.body as { detail: unknown }).detail);
+    const detail = (err.body as { detail: unknown }).detail;
+    if (typeof detail === 'string') return detail;
   }
   return 'Erro ao salvar.';
 }
@@ -37,6 +38,12 @@ function errorDetail(err: unknown): string {
  */
 export function useHorimetroEditBuffer(onReadingUpdated: (updated: Reading) => void) {
   const [buffer, setBuffer] = useState<Record<string, HorimetroRowState>>({});
+  // save() runs across multiple awaits; a plain closure over `buffer` would freeze at
+  // whatever it was when the batch started, silently ignoring edits typed to
+  // not-yet-processed rows while an earlier row's PUT is in flight. This ref always
+  // holds the latest value so save() can read live drafts on each iteration.
+  const bufferRef = useRef(buffer);
+  bufferRef.current = buffer;
 
   const getState = (reading: Reading): HorimetroRowState => buffer[reading.id] ?? cleanState(reading);
 
@@ -44,9 +51,11 @@ export function useHorimetroEditBuffer(onReadingUpdated: (updated: Reading) => v
     setBuffer((b) => ({ ...b, [readingId]: { draft, status: 'dirty' } }));
   };
 
+  // 'error' rows still hold an unsaved edit and must remain retriable via the
+  // Salvar button — only 'clean'/'saving'/'saved' rows have nothing left to submit.
   const isDirty = (reading: Reading) => {
     const state = getState(reading);
-    return state.status === 'dirty' && state.draft.trim() !== '';
+    return (state.status === 'dirty' || state.status === 'error') && state.draft.trim() !== '';
   };
 
   async function save(readings: Reading[]) {
@@ -58,9 +67,9 @@ export function useHorimetroEditBuffer(onReadingUpdated: (updated: Reading) => v
     let working = readings;
 
     for (const row of ordered) {
-      const raw = getState(row).draft.trim();
+      const raw = (bufferRef.current[row.id] ?? cleanState(row)).draft.trim();
       const value = Number(raw);
-      if (Number.isNaN(value)) {
+      if (!Number.isFinite(value)) {
         setBuffer((b) => ({ ...b, [row.id]: { ...b[row.id], status: 'error', error: 'Valor inválido.' } }));
         continue;
       }
