@@ -1,10 +1,9 @@
 import { Badge } from '@/components/ui/Badge';
 import { ReadingHistoryTable, type ReadingHistoryColumn } from '@/components/item-detail/ReadingHistoryTable';
-import { NivelChart, type NivelPoint } from '@/components/item-detail/charts/NivelChart';
-import { VazaoCorregoChart, type VazaoCorregoPoint } from '@/components/item-detail/charts/VazaoCorregoChart';
+import { SingleSeriesLineChart } from '@/components/item-detail/charts/SingleSeriesLineChart';
 import { sectionStyle, sectionTitleStyle } from '@/components/item-detail/sectionStyles';
 import type { SelectedMonth } from '@/components/shared/MonthSelector';
-import { isInMonth } from '@/lib/metrics';
+import { isInMonth, sortByDateAndRecordedAt } from '@/lib/metrics';
 import { formatNumberBR } from '@/lib/format';
 import type { MonitoredItem, Reading } from '@/types';
 
@@ -17,17 +16,19 @@ export function CorregoDetail({ item, readings, selectedMonth }: { item: Monitor
   const { year, month } = selectedMonth;
   const monthReadings = readings.filter((r) => isInMonth(r.date, year, month));
 
-  const nivelPoints: NivelPoint[] = monthReadings
-    .filter((r) => r.values.nivel != null)
-    .map((r) => ({ date: r.date, nivel: r.values.nivel! }))
-    .sort((a, b) => (a.date < b.date ? -1 : 1));
-
-  const vazaoPoints: VazaoCorregoPoint[] = monthReadings
-    .filter((r) => r.values.vazao != null)
-    .map((r) => ({ date: r.date, vazao: r.values.vazao! }))
-    .sort((a, b) => (a.date < b.date ? -1 : 1));
-
+  // Tambor doesn't capture nível at all (CONTEXT.md → Reading Derivations) — the
+  // chart section is omitted entirely rather than always shown empty.
   const isTambor = item.corregoMethod === 'tambor';
+
+  const nivelPoints = sortByDateAndRecordedAt(monthReadings.filter((r) => r.values.nivel != null)).map((r) => ({
+    date: r.date,
+    value: r.values.nivel!,
+  }));
+  const vazaoPoints = sortByDateAndRecordedAt(monthReadings.filter((r) => r.values.vazao != null)).map((r) => ({
+    date: r.date,
+    value: r.values.vazao!,
+  }));
+
   const columns: ReadingHistoryColumn[] = isTambor
     ? [
         { key: 't1', header: 't1 (s)', cell: (r) => (r.values.t1 != null ? formatNumberBR(r.values.t1) : '—') },
@@ -48,14 +49,28 @@ export function CorregoDetail({ item, readings, selectedMonth }: { item: Monitor
         <Badge variant="info">Método: {item.corregoMethod != null ? METHOD_LABEL[item.corregoMethod] : '—'}</Badge>
       </div>
 
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Nível</h3>
-        <NivelChart points={nivelPoints} />
-      </div>
+      {!isTambor && (
+        <div style={sectionStyle}>
+          <h3 style={sectionTitleStyle}>Nível</h3>
+          <SingleSeriesLineChart
+            points={nivelPoints}
+            label="Nível"
+            unit="m"
+            color="var(--color-info-text)"
+            emptyMessage="Sem leituras de nível no período."
+          />
+        </div>
+      )}
 
       <div style={sectionStyle}>
         <h3 style={sectionTitleStyle}>Vazão</h3>
-        <VazaoCorregoChart points={vazaoPoints} />
+        <SingleSeriesLineChart
+          points={vazaoPoints}
+          label="Vazão"
+          unit="m³/s"
+          color="var(--color-accent)"
+          emptyMessage="Sem leituras de vazão no período."
+        />
       </div>
 
       <ReadingHistoryTable columns={columns} rows={monthReadings} />

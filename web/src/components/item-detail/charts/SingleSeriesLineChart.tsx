@@ -2,15 +2,27 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { formatDateBR, formatNumberBR } from '@/lib/format';
 import { axisTick, emptyChartStyle, tooltipContentStyle } from '@/components/item-detail/charts/chartStyles';
 
-export interface VazaoCorregoPoint {
+export interface SeriesPoint {
   date: string;
-  vazao: number;
+  value: number;
 }
 
-/** Weekly-cadence points, plotted as-is by date — gaps between visits are normal, never connected across or filled with zeros. */
-export function VazaoCorregoChart({ points }: { points: VazaoCorregoPoint[] }) {
+/** Single-series line chart for weekly-cadence measurements (córrego nível/vazão) — gaps between visits are normal, never connected across or filled with zeros. */
+export function SingleSeriesLineChart({
+  points,
+  label,
+  unit,
+  color,
+  emptyMessage,
+}: {
+  points: SeriesPoint[];
+  label: string;
+  unit: string;
+  color: string;
+  emptyMessage: string;
+}) {
   if (points.length === 0) {
-    return <div style={emptyChartStyle}>Sem leituras de vazão no período.</div>;
+    return <div style={emptyChartStyle}>{emptyMessage}</div>;
   }
 
   return (
@@ -22,9 +34,9 @@ export function VazaoCorregoChart({ points }: { points: VazaoCorregoPoint[] }) {
         <Tooltip
           contentStyle={tooltipContentStyle}
           labelFormatter={(date) => formatDateBR(String(date))}
-          formatter={(value) => [`${formatNumberBR(Number(value))} m³/s`, 'Vazão']}
+          formatter={(value) => [`${formatNumberBR(Number(value))} ${unit}`, label]}
         />
-        <Line type="monotone" dataKey="vazao" name="Vazão" stroke="var(--color-accent)" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
+        <Line type="monotone" dataKey="value" name={label} stroke={color} strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
       </LineChart>
     </ResponsiveContainer>
   );

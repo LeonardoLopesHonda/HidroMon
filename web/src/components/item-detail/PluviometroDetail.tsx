@@ -4,31 +4,31 @@ import { PrecipitationBarChart, type PrecipitationPoint } from '@/components/ite
 import { YearlyPrecipitationSummary } from '@/components/item-detail/charts/YearlyPrecipitationSummary';
 import { sectionStyle, sectionTitleStyle } from '@/components/item-detail/sectionStyles';
 import type { SelectedMonth } from '@/components/shared/MonthSelector';
-import { isInMonth, monthlyPrecipitationTotals } from '@/lib/metrics';
+import { isInMonth, monthlyPrecipitationTotals, sortByDateAndRecordedAt } from '@/lib/metrics';
 import { formatNumberBR } from '@/lib/format';
 import type { Reading } from '@/types';
 
 export function PluviometroDetail({ readings, selectedMonth }: { readings: Reading[]; selectedMonth: SelectedMonth }) {
   const { year, month } = selectedMonth;
   const monthReadings = readings.filter((r) => isInMonth(r.date, year, month));
-  const monthTotalMm = monthReadings.reduce((sum, r) => sum + (r.values.valor ?? 0), 0);
-
-  const dailyPoints: PrecipitationPoint[] = monthReadings
-    .filter((r) => r.values.valor != null)
-    .map((r) => ({ date: r.date, mm: r.values.valor! }))
-    .sort((a, b) => (a.date < b.date ? -1 : 1));
 
   const yearlyTotals = monthlyPrecipitationTotals(readings, year);
+  const monthTotal = yearlyTotals.find((p) => p.month === month) ?? { totalMm: 0, hasData: false };
+
+  const dailyPoints: PrecipitationPoint[] = sortByDateAndRecordedAt(monthReadings.filter((r) => r.values.valor != null)).map((r) => ({
+    date: r.date,
+    mm: r.values.valor!,
+  }));
 
   const columns: ReadingHistoryColumn[] = [
-    { key: 'mm', header: 'Precipitação (mm)', cell: (r) => (r.values.valor != null ? formatNumberBR(r.values.valor) : '—') },
+    { key: 'valor', header: 'Precipitação (mm)', cell: (r) => (r.values.valor != null ? formatNumberBR(r.values.valor) : '—') },
     { key: 'observacoes', header: 'Observações', cell: (r) => r.observacoes ?? '—' },
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div style={sectionStyle}>
-        <StatTile label="Total do mês" value={`${formatNumberBR(monthTotalMm)} mm`} />
+        <StatTile label="Total do mês" value={monthTotal.hasData ? `${formatNumberBR(monthTotal.totalMm)} mm` : '—'} />
       </div>
 
       <div style={sectionStyle}>
