@@ -20,6 +20,8 @@ def _base_kwargs(**overrides):
         durh_number=None,
         outorga_number=None,
         barramento_durh=None,
+        last_tecnico_responsavel=None,
+        last_crea=None,
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )

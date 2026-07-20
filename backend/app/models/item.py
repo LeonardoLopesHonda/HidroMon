@@ -25,5 +25,7 @@ class ItemResponse(BaseModel):
     durh_number: str | None
     outorga_number: str | None
     barramento_durh: str | None
+    last_tecnico_responsavel: str | None
+    last_crea: str | None
     created_at: datetime
     updated_at: datetime
