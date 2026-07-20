@@ -49,6 +49,8 @@ class MonitoredItem(Base):
     durh_number: Mapped[str | None] = mapped_column(String)
     outorga_number: Mapped[str | None] = mapped_column(String)
     barramento_durh: Mapped[str | None] = mapped_column(String)
+    last_tecnico_responsavel: Mapped[str | None] = mapped_column(String)
+    last_crea: Mapped[str | None] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 

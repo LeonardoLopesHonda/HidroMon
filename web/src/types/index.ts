@@ -22,6 +22,8 @@ export interface MonitoredItem {
   durhNumber: string | null;
   outorgaNumber: string | null;
   barramentoDurh: string | null;
+  lastTecnicoResponsavel: string | null;
+  lastCrea: string | null;
   createdAt: string;
   updatedAt: string;
 }
