@@ -67,11 +67,11 @@ def generate_imasul_report(
         ws[f"{periodo_col}{row}"] = dias_no_mes
 
     if observacoes:
-        ws["A14"] = observacoes
+        ws["A14"] = _safe_text(observacoes)
     if barramento_durh:
-        ws["D24"] = barramento_durh
-    ws["C26"] = tecnico
-    ws["H26"] = crea
+        ws["D24"] = _safe_text(barramento_durh)
+    ws["C26"] = _safe_text(tecnico)
+    ws["H26"] = _safe_text(crea)
     ws["H28"] = data_filing
 
     item.last_tecnico_responsavel = tecnico
@@ -81,6 +81,14 @@ def generate_imasul_report(
     buffer = io.BytesIO()
     wb.save(buffer)
     return buffer.getvalue()
+
+
+def _safe_text(value: str) -> str:
+    """Neutralizes formula injection (CWE-1236): a leading =, +, -, or @ would let
+    Excel/LibreOffice interpret free-text filing fields as a formula when opened."""
+    if value and value[0] in ("=", "+", "-", "@"):
+        return f"'{value}"
+    return value
 
 
 def _cell_for_month(month: int) -> tuple[str, str, str, int]:

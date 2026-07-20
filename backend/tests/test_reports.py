@@ -210,3 +210,24 @@ def test_report_persists_tecnico_crea_for_next_prefill(db_session, item):
     db_session.refresh(item)
     assert item.last_tecnico_responsavel == "Beatriz Lima"
     assert item.last_crea == "MS-98765"
+
+
+def test_report_neutralizes_formula_injection_in_free_text_fields(db_session, item):
+    content = report_service.generate_imasul_report(
+        db_session,
+        item.id,
+        2025,
+        "=cmd|'/c calc'!A1",
+        "+123",
+        date(2025, 1, 10),
+        "-2+3",
+        "@evil",
+    )
+
+    wb = openpyxl.load_workbook(io.BytesIO(content))
+    ws = wb.active
+
+    assert ws["C26"].value == "'=cmd|'/c calc'!A1"
+    assert ws["H26"].value == "'+123"
+    assert ws["A14"].value == "'-2+3"
+    assert ws["D24"].value == "'@evil"
