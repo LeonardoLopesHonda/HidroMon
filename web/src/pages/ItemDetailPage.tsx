@@ -52,6 +52,14 @@ export function ItemDetailPage() {
   const item = useMemo(() => items.find((i) => i.id === itemId), [items, itemId]);
   const area = useMemo(() => areas.find((a) => a.id === item?.areaId), [areas, item]);
   const itemReadings = useMemo(() => readings.filter((r) => r.itemId === itemId), [readings, itemId]);
+  const pluviometro = useMemo(
+    () => (item ? items.find((i) => i.areaId === item.areaId && i.type === 'pluviometro') : undefined),
+    [items, item],
+  );
+  const pluviometroReadings = useMemo(
+    () => (pluviometro ? readings.filter((r) => r.itemId === pluviometro.id) : []),
+    [readings, pluviometro],
+  );
 
   const handleReadingUpdated = useCallback((updated: Reading) => {
     setReadings((rs) => rs.map((r) => (r.id === updated.id ? updated : r)));
@@ -94,6 +102,8 @@ export function ItemDetailPage() {
               readings={itemReadings}
               selectedMonth={selectedMonth}
               onReadingUpdated={handleReadingUpdated}
+              pluviometro={pluviometro}
+              pluviometroReadings={pluviometroReadings}
             />
           )}
           {item.type === 'pluviometro' && <PluviometroDetail key={item.id} readings={itemReadings} selectedMonth={selectedMonth} />}
