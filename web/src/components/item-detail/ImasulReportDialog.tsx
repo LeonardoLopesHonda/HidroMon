@@ -30,12 +30,11 @@ export function ImasulReportDialog({ item, onClose }: { item: MonitoredItem; onC
   const [data, setData] = useState(todayISO());
   const [barramentoDurh, setBarramentoDurh] = useState(item.barramentoDurh ?? '');
   const [observacoes, setObservacoes] = useState('');
-  const [downloading, setDownloading] = useState(false);
+  const [downloadingFormat, setDownloadingFormat] = useState<'xlsx' | 'pdf' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setDownloading(true);
+  const download = async (format: 'xlsx' | 'pdf') => {
+    setDownloadingFormat(format);
     setError(null);
     try {
       await downloadImasulReport({
@@ -46,13 +45,19 @@ export function ImasulReportDialog({ item, onClose }: { item: MonitoredItem; onC
         data,
         observacoes: observacoes || undefined,
         barramentoDurh: barramentoDurh || undefined,
+        format,
       });
       onClose();
     } catch (err) {
       setError(err instanceof ApiError ? 'Não foi possível gerar o relatório.' : 'Erro de conexão com o servidor.');
     } finally {
-      setDownloading(false);
+      setDownloadingFormat(null);
     }
+  };
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    download('xlsx');
   };
 
   return (
@@ -127,8 +132,25 @@ export function ImasulReportDialog({ item, onClose }: { item: MonitoredItem; onC
             Cancelar
           </button>
           <button
+            type="button"
+            onClick={() => download('pdf')}
+            disabled={downloadingFormat !== null}
+            style={{
+              padding: '7px 16px',
+              borderRadius: 8,
+              border: '1px solid var(--color-border-input)',
+              background: 'var(--color-surface)',
+              color: 'var(--color-text)',
+              font: '600 12.5px var(--font-sans)',
+              opacity: downloadingFormat !== null ? 0.5 : 1,
+              cursor: downloadingFormat !== null ? 'default' : 'pointer',
+            }}
+          >
+            {downloadingFormat === 'pdf' ? 'Gerando…' : 'Baixar .pdf'}
+          </button>
+          <button
             type="submit"
-            disabled={downloading}
+            disabled={downloadingFormat !== null}
             style={{
               padding: '7px 16px',
               borderRadius: 8,
@@ -136,11 +158,11 @@ export function ImasulReportDialog({ item, onClose }: { item: MonitoredItem; onC
               background: 'var(--color-accent)',
               color: '#fff',
               font: '600 12.5px var(--font-sans)',
-              opacity: downloading ? 0.5 : 1,
-              cursor: downloading ? 'default' : 'pointer',
+              opacity: downloadingFormat !== null ? 0.5 : 1,
+              cursor: downloadingFormat !== null ? 'default' : 'pointer',
             }}
           >
-            {downloading ? 'Gerando…' : 'Baixar .xlsx'}
+            {downloadingFormat === 'xlsx' ? 'Gerando…' : 'Baixar .xlsx'}
           </button>
         </div>
       </form>
