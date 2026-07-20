@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getAreas, getItems, getReadings } from '@/lib/api/resources';
 import { ApiError } from '@/lib/api/client';
@@ -51,6 +51,10 @@ export function ItemDetailPage() {
   const area = useMemo(() => areas.find((a) => a.id === item?.areaId), [areas, item]);
   const itemReadings = useMemo(() => readings.filter((r) => r.itemId === itemId), [readings, itemId]);
 
+  const handleReadingUpdated = useCallback((updated: Reading) => {
+    setReadings((rs) => rs.map((r) => (r.id === updated.id ? updated : r)));
+  }, []);
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
       <AppHeader />
@@ -83,7 +87,9 @@ export function ItemDetailPage() {
               <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
             </div>
 
-            {item.type === 'hidrometro' && <HidrometroDetail item={item} readings={itemReadings} selectedMonth={selectedMonth} />}
+            {item.type === 'hidrometro' && (
+              <HidrometroDetail item={item} readings={itemReadings} selectedMonth={selectedMonth} onReadingUpdated={handleReadingUpdated} />
+            )}
           </div>
         )}
       </main>
