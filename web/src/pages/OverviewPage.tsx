@@ -5,19 +5,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { MonthSelector, currentMonth, type SelectedMonth } from '@/components/shared/MonthSelector';
 import { ComplianceCard } from '@/components/overview/ComplianceCard';
 import { CompactCard } from '@/components/overview/CompactCard';
-import {
-  dailyRate,
-  daysElapsedInMonth,
-  exceedanceChecks,
-  horasOperadas,
-  isInMonth,
-  measuredHoursPerDay,
-  monthEndProjection,
-  monthlyCap,
-  monthlyConsumption,
-  nextMonthStartISO,
-  vazaoEfetivaHorimetro,
-} from '@/lib/metrics';
+import { hidrometroMonthStats, isInMonth, nextMonthStartISO } from '@/lib/metrics';
 import type { Area, MonitoredItem, Reading } from '@/types';
 
 export function OverviewPage() {
@@ -78,10 +66,6 @@ export function OverviewPage() {
   const today = new Date();
   const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const monthBoundary = nextMonthStartISO(selectedMonth.year, selectedMonth.month);
-  // For a past month, todayISO is already well past its end, so this clamps to the
-  // full fixed 30-day period on its own — no separate "is this the current month"
-  // branch needed.
-  const daysElapsed = daysElapsedInMonth(selectedMonth.year, selectedMonth.month, todayISO);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -127,63 +111,18 @@ export function OverviewPage() {
                       const itemReadings = readingsByItem.get(item.id) ?? [];
 
                       if (item.type === 'hidrometro') {
-                        const readingsUpToMonth = itemReadings.filter((r) => r.date < monthBoundary);
-                        const monthToDateConsumption = monthlyConsumption(
-                          itemReadings,
-                          selectedMonth.year,
-                          selectedMonth.month
-                        );
-                        const cap = monthlyCap(item);
-                        const projection = monthEndProjection(monthToDateConsumption, daysElapsed);
-
-                        // Only a rate point dated within the selected month counts as
-                        // "current" — otherwise an item with no reading this month would
-                        // surface an exceedance badge computed from a stale, months-old
-                        // reading pair on an otherwise-empty ("within") card.
-                        const rateSeries = dailyRate(readingsUpToMonth).filter((p) =>
-                          isInMonth(p.date, selectedMonth.year, selectedMonth.month)
-                        );
-                        const latestDailyRate = rateSeries.length > 0 ? rateSeries[rateSeries.length - 1].rate : null;
-                        const dailyCap = item.limiteOutorgado != null ? item.limiteOutorgado * item.horasOperacao : 0;
-
-                        const hoursPerDaySeries = item.hasHorimetro
-                          ? measuredHoursPerDay(readingsUpToMonth).filter((p) =>
-                              isInMonth(p.date, selectedMonth.year, selectedMonth.month)
-                            )
-                          : [];
-                        const latestHoursPerDay =
-                          hoursPerDaySeries.length > 0 ? hoursPerDaySeries[hoursPerDaySeries.length - 1].hoursPerDay : null;
-
-                        const checks = exceedanceChecks({
-                          monthToDateConsumption,
-                          cap,
-                          projection,
-                          latestDailyRate,
-                          dailyCap,
-                          measuredHoursPerDay: latestHoursPerDay,
-                          horasOperacao: item.horasOperacao,
-                        });
-
-                        const monthHoras = item.hasHorimetro
-                          ? horasOperadas(itemReadings, selectedMonth.year, selectedMonth.month)
-                          : null;
-                        const vazaoSeries = item.hasHorimetro
-                          ? vazaoEfetivaHorimetro(readingsUpToMonth).filter((p) =>
-                              isInMonth(p.date, selectedMonth.year, selectedMonth.month)
-                            )
-                          : [];
-                        const latestVazaoEfetiva = vazaoSeries.length > 0 ? vazaoSeries[vazaoSeries.length - 1].vazao : null;
+                        const stats = hidrometroMonthStats(item, itemReadings, selectedMonth.year, selectedMonth.month, todayISO);
 
                         return (
                           <ComplianceCard
                             key={item.id}
                             itemName={item.name}
-                            monthToDateConsumption={monthToDateConsumption}
-                            cap={cap}
-                            projection={projection}
-                            checks={checks}
-                            horasOperadas={monthHoras}
-                            vazaoEfetiva={latestVazaoEfetiva}
+                            monthToDateConsumption={stats.monthToDateConsumption}
+                            cap={stats.cap}
+                            projection={stats.projection}
+                            checks={stats.checks}
+                            horasOperadas={stats.monthHoras}
+                            vazaoEfetiva={stats.latestVazaoEfetiva}
                             horasOperacao={item.horasOperacao}
                           />
                         );

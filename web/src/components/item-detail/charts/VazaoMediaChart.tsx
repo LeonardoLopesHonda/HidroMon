@@ -1,8 +1,7 @@
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { isInMonth, vazaoEfetivaHorimetro, vazaoMediaOutorgaSeries, type VazaoEfetivaPoint } from '@/lib/metrics';
+import type { VazaoEfetivaPoint } from '@/lib/metrics';
 import { formatDateBR, formatNumberBR } from '@/lib/format';
 import { axisTick, emptyChartStyle, tooltipContentStyle } from '@/components/item-detail/charts/chartStyles';
-import type { MonitoredItem, Reading } from '@/types';
 
 interface MergedPoint {
   date: string;
@@ -22,20 +21,15 @@ function mergeByDate(a: VazaoEfetivaPoint[], b: VazaoEfetivaPoint[]): MergedPoin
 }
 
 export function VazaoMediaChart({
-  readingsUpToMonth,
-  year,
-  month,
-  item,
+  vazaoMediaSeries,
+  vazaoEfetivaSeries,
+  limiteOutorgado,
 }: {
-  readingsUpToMonth: Reading[];
-  year: number;
-  month: number;
-  item: MonitoredItem;
+  vazaoMediaSeries: VazaoEfetivaPoint[];
+  vazaoEfetivaSeries: VazaoEfetivaPoint[];
+  limiteOutorgado: number | null;
 }) {
-  const inMonth = (p: VazaoEfetivaPoint) => isInMonth(p.date, year, month);
-  const vazaoMedia = vazaoMediaOutorgaSeries(readingsUpToMonth, item.horasOperacao).filter(inMonth);
-  const vazaoEfetiva = item.hasHorimetro ? vazaoEfetivaHorimetro(readingsUpToMonth).filter(inMonth) : [];
-  const points = mergeByDate(vazaoMedia, vazaoEfetiva);
+  const points = mergeByDate(vazaoMediaSeries, vazaoEfetivaSeries);
 
   if (points.length === 0) {
     return <div style={emptyChartStyle}>Sem leituras suficientes para vazão.</div>;
@@ -52,7 +46,7 @@ export function VazaoMediaChart({
           labelFormatter={(date) => formatDateBR(String(date))}
           formatter={(value, name) => [`${formatNumberBR(Number(value))} m³/h`, String(name)]}
         />
-        {item.limiteOutorgado != null && <ReferenceLine y={item.limiteOutorgado} stroke="var(--color-warn-accent)" strokeDasharray="6 4" />}
+        {limiteOutorgado != null && <ReferenceLine y={limiteOutorgado} stroke="var(--color-warn-accent)" strokeDasharray="6 4" />}
         <Line
           type="monotone"
           dataKey="vazaoMedia"

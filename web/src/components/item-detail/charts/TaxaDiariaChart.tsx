@@ -1,22 +1,9 @@
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { dailyRate, isInMonth } from '@/lib/metrics';
+import type { DailyRatePoint } from '@/lib/metrics';
 import { formatDateBR, formatNumberBR } from '@/lib/format';
 import { axisTick, emptyChartStyle, tooltipContentStyle } from '@/components/item-detail/charts/chartStyles';
-import type { Reading } from '@/types';
 
-export function TaxaDiariaChart({
-  readingsUpToMonth,
-  year,
-  month,
-  dailyCap,
-}: {
-  readingsUpToMonth: Reading[];
-  year: number;
-  month: number;
-  dailyCap: number;
-}) {
-  const points = dailyRate(readingsUpToMonth).filter((p) => isInMonth(p.date, year, month));
-
+export function TaxaDiariaChart({ points, dailyCap }: { points: DailyRatePoint[]; dailyCap: number }) {
   if (points.length === 0) {
     return <div style={emptyChartStyle}>Sem leituras suficientes para a taxa diária.</div>;
   }

@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { formatDateBR } from '@/lib/format';
+import { sortByDateAndRecordedAt } from '@/lib/metrics';
 import type { Reading } from '@/types';
 
 export interface ReadingHistoryColumn {
@@ -26,10 +27,7 @@ const tdStyle: CSSProperties = {
 };
 
 function sortNewestFirst(rows: Reading[]): Reading[] {
-  return [...rows].sort((a, b) => {
-    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
-    return a.recordedAt < b.recordedAt ? 1 : a.recordedAt > b.recordedAt ? -1 : 0;
-  });
+  return sortByDateAndRecordedAt(rows).reverse();
 }
 
 /** Type-agnostic reading history table — callers supply the value columns; the date column and sort order are shared. */

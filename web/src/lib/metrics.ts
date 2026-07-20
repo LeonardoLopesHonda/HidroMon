@@ -91,18 +91,21 @@ export function monthlyCap(item: Pick<MonitoredItem, 'limiteOutorgado' | 'horasO
 }
 
 export interface CumulativeSeriesPoint {
-  day: number; // 1..30, fixed outorga month
+  day: number; // 1..N, N = max(30, actual days in the calendar month)
   date: string;
   cumulative: number | null; // populated only on days with an actual reading
   pace: number; // straight cap-pace reference, populated every day
 }
 
 /**
- * One point per calendar day of the fixed 30-day outorga month (not per
- * reading). `pace` is populated every day so it renders as a clean straight
- * diagonal; `cumulative` uses the same baseline convention as
- * monthlyConsumption and is populated only on days with an actual reading —
- * gaps stay gaps instead of dropping to zero.
+ * One point per calendar day (not per reading), covering at least the fixed
+ * 30-day outorga month so `pace` always reaches the nominal cap, but extended
+ * to the real length of 31-day months so a reading on the 31st isn't dropped
+ * (a real reading must never disappear just because the outorga's accounting
+ * period is nominally 30 days). `pace` is populated every day so it renders
+ * as a clean straight diagonal; `cumulative` uses the same baseline
+ * convention as monthlyConsumption and is populated only on days with an
+ * actual reading — gaps stay gaps instead of dropping to zero.
  */
 export function cumulativeConsumptionSeries(
   readings: Reading[],
@@ -119,9 +122,11 @@ export function cumulativeConsumptionSeries(
   const readingByDate = new Map<string, Reading>();
   for (const r of inMonth) readingByDate.set(r.date, r);
 
+  const daysInCalendarMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const totalDays = Math.max(30, daysInCalendarMonth);
   const monthStartDays = toUTCDays(monthStart);
   const points: CumulativeSeriesPoint[] = [];
-  for (let day = 1; day <= 30; day++) {
+  for (let day = 1; day <= totalDays; day++) {
     const date = new Date((monthStartDays + day - 1) * 86_400_000).toISOString().slice(0, 10);
     const reading = readingByDate.get(date);
     const cumulative = reading && baseline ? reading.values.valor! - baseline.values.valor! : null;
@@ -178,7 +183,8 @@ export function measuredHoursPerDay(readings: Reading[]): HoursPerDayPoint[] {
   return points;
 }
 
-function sortByDateAndRecordedAt(readings: Reading[]): Reading[] {
+/** Same (date, recordedAt) ordering the server uses — the tiebreak `sortByDate` alone can't express. */
+export function sortByDateAndRecordedAt(readings: Reading[]): Reading[] {
   return [...readings].sort((a, b) => {
     if (a.date !== b.date) return a.date < b.date ? -1 : 1;
     return a.recordedAt < b.recordedAt ? -1 : a.recordedAt > b.recordedAt ? 1 : 0;
@@ -267,6 +273,90 @@ export function exceedanceChecks(params: {
     dailyRateOver,
     hoursOver,
     cardState: monthToDateOver ? 'over' : projectedOver ? 'projected-over' : 'within',
+  };
+}
+
+export interface HidrometroMonthStats {
+  readingsUpToMonth: Reading[];
+  monthReadings: Reading[];
+  monthToDateConsumption: number;
+  cap: number;
+  projection: number;
+  rateSeries: DailyRatePoint[];
+  latestDailyRate: number | null;
+  dailyCap: number;
+  vazaoMediaSeries: VazaoEfetivaPoint[];
+  latestVazaoMedia: number | null;
+  vazaoEfetivaSeries: VazaoEfetivaPoint[];
+  latestVazaoEfetiva: number | null;
+  latestHoursPerDay: number | null;
+  checks: ExceedanceChecks;
+  monthHoras: number | null;
+}
+
+/**
+ * Every derived figure a hidrômetro month view needs (Overview compliance
+ * card, Item Detail stat row + charts), computed once from the same inputs
+ * so the two pages can never drift on how a figure is derived.
+ */
+export function hidrometroMonthStats(
+  item: Pick<MonitoredItem, 'limiteOutorgado' | 'horasOperacao' | 'hasHorimetro'>,
+  readings: Reading[],
+  year: number,
+  month: number,
+  todayISO: string
+): HidrometroMonthStats {
+  const daysElapsed = daysElapsedInMonth(year, month, todayISO);
+  const monthBoundary = nextMonthStartISO(year, month);
+  const readingsUpToMonth = readings.filter((r) => r.date < monthBoundary);
+  const monthReadings = readings.filter((r) => isInMonth(r.date, year, month));
+
+  const monthToDateConsumption = monthlyConsumption(readings, year, month);
+  const cap = monthlyCap(item);
+  const projection = monthEndProjection(monthToDateConsumption, daysElapsed);
+
+  const inMonth = <T extends { date: string }>(p: T) => isInMonth(p.date, year, month);
+  const rateSeries = dailyRate(readingsUpToMonth).filter(inMonth);
+  const latestDailyRate = rateSeries.length > 0 ? rateSeries[rateSeries.length - 1].rate : null;
+  const dailyCap = item.limiteOutorgado != null ? item.limiteOutorgado * item.horasOperacao : 0;
+
+  const vazaoMediaSeries = rateSeries.map((p) => ({ date: p.date, vazao: vazaoMediaOutorga(p.rate, item.horasOperacao) }));
+  const latestVazaoMedia = latestDailyRate != null ? vazaoMediaOutorga(latestDailyRate, item.horasOperacao) : null;
+
+  const vazaoEfetivaSeries = item.hasHorimetro ? vazaoEfetivaHorimetro(readingsUpToMonth).filter(inMonth) : [];
+  const latestVazaoEfetiva = vazaoEfetivaSeries.length > 0 ? vazaoEfetivaSeries[vazaoEfetivaSeries.length - 1].vazao : null;
+
+  const hoursPerDaySeries = item.hasHorimetro ? measuredHoursPerDay(readingsUpToMonth).filter(inMonth) : [];
+  const latestHoursPerDay = hoursPerDaySeries.length > 0 ? hoursPerDaySeries[hoursPerDaySeries.length - 1].hoursPerDay : null;
+
+  const checks = exceedanceChecks({
+    monthToDateConsumption,
+    cap,
+    projection,
+    latestDailyRate,
+    dailyCap,
+    measuredHoursPerDay: latestHoursPerDay,
+    horasOperacao: item.horasOperacao,
+  });
+
+  const monthHoras = item.hasHorimetro ? horasOperadas(readings, year, month) : null;
+
+  return {
+    readingsUpToMonth,
+    monthReadings,
+    monthToDateConsumption,
+    cap,
+    projection,
+    rateSeries,
+    latestDailyRate,
+    dailyCap,
+    vazaoMediaSeries,
+    latestVazaoMedia,
+    vazaoEfetivaSeries,
+    latestVazaoEfetiva,
+    latestHoursPerDay,
+    checks,
+    monthHoras,
   };
 }
 

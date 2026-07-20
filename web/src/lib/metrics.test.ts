@@ -5,6 +5,7 @@ import {
   daysElapsedInMonth,
   dailyRate,
   exceedanceChecks,
+  hidrometroMonthStats,
   horasOperadas,
   horimetroBounds,
   measuredHoursPerDay,
@@ -218,8 +219,8 @@ describe('other per-item metrics', () => {
 });
 
 describe('cumulativeConsumptionSeries', () => {
-  it('populates pace every day as a straight line from 0 to the cap', () => {
-    const points = cumulativeConsumptionSeries([], 2026, 7, 300);
+  it('populates pace every day as a straight line from 0 to the cap, for a 30-day month', () => {
+    const points = cumulativeConsumptionSeries([], 2026, 6, 300); // June — 30 days
     expect(points).toHaveLength(30);
     expect(points[0]).toMatchObject({ day: 1, pace: 10 });
     expect(points[14]).toMatchObject({ day: 15, pace: 150 });
@@ -237,6 +238,19 @@ describe('cumulativeConsumptionSeries', () => {
   it('leaves cumulative null throughout when the item has no baseline (start of history, no in-month reading either)', () => {
     const points = cumulativeConsumptionSeries([], 2026, 7, 300);
     expect(points.every((p) => p.cumulative === null)).toBe(true);
+  });
+
+  it('extends the grid to 31 days so a reading on the last day of a 31-day month is never dropped', () => {
+    const readings = [reading('2026-06-28', 900), reading('2026-07-31', 1200)];
+    const points = cumulativeConsumptionSeries(readings, 2026, 7, 300);
+    expect(points).toHaveLength(31);
+    expect(points[30]).toMatchObject({ day: 31, date: '2026-07-31', cumulative: 300 });
+  });
+
+  it('still generates a full 30-day grid for a 28-day February, so pace reaches the nominal cap', () => {
+    const points = cumulativeConsumptionSeries([], 2026, 2, 300);
+    expect(points).toHaveLength(30);
+    expect(points[29]).toMatchObject({ day: 30, pace: 300 });
   });
 });
 
@@ -295,5 +309,31 @@ describe('horimetroBounds', () => {
     const target = reading('2026-07-10', 1040, 530);
     const readings = [reading('2026-07-01', 1000, 500), target, reading('2026-07-20', 1080, 560)];
     expect(horimetroBounds(readings, target.id)).toEqual({ lower: 500, upper: 560 });
+  });
+});
+
+describe('hidrometroMonthStats', () => {
+  const item = { limiteOutorgado: 10, horasOperacao: 20, hasHorimetro: true };
+
+  it('composes monthly consumption, cap, projection, and exceedance checks consistently with the individual metric functions', () => {
+    const readings = [reading('2026-06-30', 900, 400), reading('2026-07-05', 950, 410), reading('2026-07-10', 1000, 420)];
+    const stats = hidrometroMonthStats(item, readings, 2026, 7, '2026-07-10');
+
+    expect(stats.monthToDateConsumption).toBe(100); // 1000 - 900 (last-of-month minus last-before-month)
+    expect(stats.cap).toBe(6000); // 10 * 20 * 30
+    expect(stats.checks.cardState).toBe('within');
+    expect(stats.monthHoras).toBe(10); // 420 - 410, the two in-month horímetro readings
+    expect(stats.latestVazaoMedia).toBe(0.5); // latest taxa diária 10 m³/dia / horasOperacao 20
+  });
+
+  it('does not crash and reports no exceedance when the item has no outorga limit configured', () => {
+    const noCapItem = { limiteOutorgado: null, horasOperacao: 24, hasHorimetro: false };
+    const readings = [reading('2026-06-28', 900), reading('2026-07-10', 1000)];
+    const stats = hidrometroMonthStats(noCapItem, readings, 2026, 7, '2026-07-10');
+
+    expect(stats.cap).toBe(0);
+    expect(stats.checks.cardState).toBe('within');
+    expect(stats.checks.monthToDateOver).toBe(false);
+    expect(stats.monthHoras).toBeNull();
   });
 });

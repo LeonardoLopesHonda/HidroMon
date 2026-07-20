@@ -34,7 +34,9 @@ export function CumulativeConsumptionChart({
           labelFormatter={(day) => `Dia ${day}`}
           formatter={(value, name) => [value == null ? '—' : `${formatNumberBR(Number(value))} m³`, String(name)]}
         />
-        <Line type="linear" dataKey="pace" name="Ritmo da outorga" stroke="var(--color-text-faint)" strokeWidth={1.5} strokeDasharray="5 4" dot={false} />
+        {cap > 0 && (
+          <Line type="linear" dataKey="pace" name="Ritmo da outorga" stroke="var(--color-text-faint)" strokeWidth={1.5} strokeDasharray="5 4" dot={false} />
+        )}
         <Line
           type="monotone"
           dataKey="cumulative"
