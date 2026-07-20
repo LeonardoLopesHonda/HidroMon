@@ -73,6 +73,9 @@ def generate_imasul_report(
     ws["C26"] = _safe_text(tecnico)
     ws["H26"] = _safe_text(crea)
     ws["H28"] = data_filing
+    # Template ships with a long-form date format ("segunda-feira, julho..."); override
+    # with the short pt-BR convention instead.
+    ws["H28"].number_format = "dd/mm/yyyy"
 
     item.last_tecnico_responsavel = tecnico
     item.last_crea = crea
