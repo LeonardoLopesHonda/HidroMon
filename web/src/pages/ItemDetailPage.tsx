@@ -53,7 +53,7 @@ export function ItemDetailPage() {
   const area = useMemo(() => areas.find((a) => a.id === item?.areaId), [areas, item]);
   const itemReadings = useMemo(() => readings.filter((r) => r.itemId === itemId), [readings, itemId]);
   const pluviometro = useMemo(
-    () => (item ? items.find((i) => i.areaId === item.areaId && i.type === 'pluviometro') : undefined),
+    () => (item ? items.find((i) => i.areaId === item.areaId && i.type === 'pluviometro' && !i.disabled) : undefined),
     [items, item],
   );
   const pluviometroReadings = useMemo(
