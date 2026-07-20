@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getAreas, getItems, getReadings } from '@/lib/api/resources';
 import { ApiError } from '@/lib/api/client';
 import { AppHeader } from '@/components/AppHeader';
@@ -106,8 +107,9 @@ export function AreasPage() {
                     {areaItems.map((item, i) => {
                       const latest = latestReadingDate(readings, item.id);
                       return (
-                        <div
+                        <Link
                           key={item.id}
+                          to={`/items/${item.id}`}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -116,6 +118,7 @@ export function AreasPage() {
                             padding: '14px 20px',
                             borderTop: i === 0 ? 'none' : '1px solid var(--color-border-light)',
                             opacity: item.disabled ? 0.7 : 1,
+                            textDecoration: 'none',
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -128,7 +131,7 @@ export function AreasPage() {
                           <span style={{ font: '400 12px var(--font-sans)', color: 'var(--color-text-faint)' }}>
                             {latest ? `Última leitura ${formatDateBR(latest)}` : 'Sem leituras'}
                           </span>
-                        </div>
+                        </Link>
                       );
                     })}
                   </div>

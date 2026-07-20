@@ -19,6 +19,9 @@ export interface MonitoredItem {
   corregoMethod: 'regua' | 'tambor' | null;
   hasHorimetro: boolean;
   disabled: boolean;
+  durhNumber: string | null;
+  outorgaNumber: string | null;
+  barramentoDurh: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/Badge';
 import { formatNumberBR, formatPercentBR } from '@/lib/format';
 import type { ExceedanceChecks } from '@/lib/metrics';
 
-const STATE_LABEL: Record<ExceedanceChecks['cardState'], string> = {
+export const STATE_LABEL: Record<ExceedanceChecks['cardState'], string> = {
   within: 'Dentro da outorga',
   'projected-over': 'Projeção acima da outorga',
   over: 'Consumo acima da outorga',
