@@ -1,5 +1,6 @@
 import io
 import uuid
+import zipfile
 from datetime import date, datetime, timezone
 
 import openpyxl
@@ -200,6 +201,20 @@ def test_report_fills_header_and_vazao_leap_year(db_session, item):
     assert ws["C26"].value == "Ana Souza"
     assert ws["H26"].value == "MS-12345"
     assert ws["H28"].value == datetime(2024, 12, 20)
+    assert ws["H28"].number_format == "dd/mm/yyyy"
+
+
+def test_report_preserves_template_logos(db_session, item):
+    """openpyxl only round-trips embedded images through load_workbook()/save()
+    when Pillow is installed; without it, images are silently dropped with no
+    error. Guards against that dependency quietly going missing again."""
+    content = report_service.generate_imasul_report(
+        db_session, item.id, 2025, "Fulano", "123", date(2025, 1, 10), None, None
+    )
+
+    with zipfile.ZipFile(io.BytesIO(content)) as archive:
+        media_files = [n for n in archive.namelist() if n.startswith("xl/media/")]
+    assert len(media_files) == 2
 
 
 def test_report_persists_tecnico_crea_for_next_prefill(db_session, item):
