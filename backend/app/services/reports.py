@@ -1,8 +1,5 @@
 import calendar
 import io
-import shutil
-import subprocess
-import tempfile
 import uuid
 from datetime import date as date_type
 from pathlib import Path
@@ -87,49 +84,6 @@ def generate_imasul_report(
     buffer = io.BytesIO()
     wb.save(buffer)
     return buffer.getvalue()
-
-
-def convert_xlsx_to_pdf(xlsx_bytes: bytes) -> bytes:
-    """Converts a filled workbook to PDF via headless LibreOffice so the PDF
-    inherits the template's exact layout (logos, merged cells, borders)
-    instead of a hand-rebuilt rendering.
-    """
-    soffice = shutil.which("soffice") or shutil.which("libreoffice")
-    if not soffice:
-        raise HTTPException(status_code=500, detail="Conversor de PDF indisponível no servidor")
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        input_path = Path(tmpdir) / "report.xlsx"
-        input_path.write_bytes(xlsx_bytes)
-
-        # Each conversion gets its own LibreOffice user profile: concurrent
-        # `soffice` invocations sharing the default profile dir race on a
-        # lock file and fail intermittently under load.
-        profile_dir = Path(tmpdir) / "profile"
-        try:
-            subprocess.run(
-                [
-                    soffice,
-                    "--headless",
-                    "--norestore",
-                    f"-env:UserInstallation=file://{profile_dir}",
-                    "--convert-to",
-                    "pdf",
-                    "--outdir",
-                    tmpdir,
-                    str(input_path),
-                ],
-                capture_output=True,
-                timeout=60,
-                check=True,
-            )
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-            raise HTTPException(status_code=502, detail="Falha ao converter relatório para PDF") from exc
-
-        output_path = Path(tmpdir) / "report.pdf"
-        if not output_path.exists():
-            raise HTTPException(status_code=502, detail="Falha ao converter relatório para PDF")
-        return output_path.read_bytes()
 
 
 def _safe_text(value: str) -> str:

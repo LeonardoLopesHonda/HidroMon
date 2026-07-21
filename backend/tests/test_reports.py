@@ -1,6 +1,4 @@
 import io
-import shutil
-import subprocess
 import uuid
 import zipfile
 from datetime import date, datetime, timezone
@@ -9,7 +7,6 @@ import openpyxl
 import pytest
 from fastapi import HTTPException
 
-from app.api.routes import reports as report_routes
 from app.db.database import Area, MonitoredItem, Reading
 from app.services import reports as report_service
 
@@ -249,108 +246,3 @@ def test_report_neutralizes_formula_injection_in_free_text_fields(db_session, it
     assert ws["H26"].value == "'+123"
     assert ws["A14"].value == "'-2+3"
     assert ws["D24"].value == "'@evil"
-
-
-# --- PDF conversion ----------------------------------------------------------------------
-
-
-def test_convert_xlsx_to_pdf_raises_clear_error_when_soffice_missing(monkeypatch):
-    monkeypatch.setattr(shutil, "which", lambda _name: None)
-    with pytest.raises(HTTPException) as exc_info:
-        report_service.convert_xlsx_to_pdf(b"not a real workbook")
-    assert exc_info.value.status_code == 500
-
-
-def test_convert_xlsx_to_pdf_raises_clear_error_on_conversion_failure(monkeypatch):
-    monkeypatch.setattr(shutil, "which", lambda _name: "/usr/bin/soffice")
-
-    def _fail(*args, **kwargs):
-        raise subprocess.CalledProcessError(1, "soffice")
-
-    monkeypatch.setattr(subprocess, "run", _fail)
-    with pytest.raises(HTTPException) as exc_info:
-        report_service.convert_xlsx_to_pdf(b"not a real workbook")
-    assert exc_info.value.status_code == 502
-
-
-def test_convert_xlsx_to_pdf_raises_clear_error_on_timeout(monkeypatch):
-    monkeypatch.setattr(shutil, "which", lambda _name: "/usr/bin/soffice")
-
-    def _timeout(*args, **kwargs):
-        raise subprocess.TimeoutExpired("soffice", 60)
-
-    monkeypatch.setattr(subprocess, "run", _timeout)
-    with pytest.raises(HTTPException) as exc_info:
-        report_service.convert_xlsx_to_pdf(b"not a real workbook")
-    assert exc_info.value.status_code == 502
-
-
-@pytest.mark.skipif(
-    shutil.which("soffice") is None and shutil.which("libreoffice") is None,
-    reason="soffice/libreoffice not installed",
-)
-def test_convert_xlsx_to_pdf_produces_valid_pdf(db_session, item):
-    xlsx_bytes = report_service.generate_imasul_report(
-        db_session, item.id, 2025, "Fulano", "123", date(2025, 1, 10), None, None
-    )
-    pdf_bytes = report_service.convert_xlsx_to_pdf(xlsx_bytes)
-    assert pdf_bytes.startswith(b"%PDF")
-
-
-# --- PDF route wiring ----------------------------------------------------------------------
-
-
-def test_report_rejects_unsupported_format(db_session, item):
-    with pytest.raises(HTTPException) as exc_info:
-        report_routes.get_imasul_report(
-            item_id=item.id,
-            year=2024,
-            tecnico="Fulano",
-            crea="123",
-            data=date(2024, 1, 1),
-            format="docx",
-            db=db_session,
-            _="test-user",
-        )
-    assert exc_info.value.status_code == 400
-
-
-def test_report_pdf_format_converts_and_sets_pdf_headers(monkeypatch, db_session, item):
-    monkeypatch.setattr(report_service, "convert_xlsx_to_pdf", lambda _xlsx_bytes: b"%PDF-fake")
-
-    response = report_routes.get_imasul_report(
-        item_id=item.id,
-        year=2024,
-        tecnico="Fulano",
-        crea="123",
-        data=date(2024, 1, 1),
-        format="pdf",
-        db=db_session,
-        _="test-user",
-    )
-
-    assert response.media_type == "application/pdf"
-    assert response.body == b"%PDF-fake"
-    assert response.headers["content-disposition"] == (
-        f'attachment; filename="formulario-monitoramento-{item.id}-2024.pdf"'
-    )
-
-
-def test_report_pdf_conversion_failure_does_not_return_corrupt_file(monkeypatch, db_session, item):
-    def _raise(_xlsx_bytes):
-        raise HTTPException(status_code=502, detail="Falha ao converter relatório para PDF")
-
-    monkeypatch.setattr(report_service, "convert_xlsx_to_pdf", _raise)
-
-    with pytest.raises(HTTPException) as exc_info:
-        report_routes.get_imasul_report(
-            item_id=item.id,
-            year=2024,
-            tecnico="Fulano",
-            crea="123",
-            data=date(2024, 1, 1),
-            format="pdf",
-            db=db_session,
-            _="test-user",
-        )
-    assert exc_info.value.status_code == 502

@@ -24,22 +24,15 @@ def get_imasul_report(
     db: Session = Depends(get_db),
     _: str = Depends(get_current_user),
 ):
-    if format not in ("xlsx", "pdf"):
+    if format != "xlsx":
         raise HTTPException(status_code=400, detail="Formato não suportado")
 
     content = report_service.generate_imasul_report(
         db, item_id, year, tecnico, crea, data, observacoes, barramento_durh
     )
-
-    if format == "pdf":
-        content = report_service.convert_xlsx_to_pdf(content)
-        media_type = "application/pdf"
-    else:
-        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-    filename = f"formulario-monitoramento-{item_id}-{year}.{format}"
+    filename = f"formulario-monitoramento-{item_id}-{year}.xlsx"
     return Response(
         content=content,
-        media_type=media_type,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

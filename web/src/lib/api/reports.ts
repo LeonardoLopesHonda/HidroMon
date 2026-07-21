@@ -8,7 +8,6 @@ export interface ImasulReportParams {
   data: string; // YYYY-MM-DD
   observacoes?: string;
   barramentoDurh?: string;
-  format?: 'xlsx' | 'pdf';
 }
 
 function filenameFromContentDisposition(header: string | null, fallback: string): string {
@@ -16,9 +15,8 @@ function filenameFromContentDisposition(header: string | null, fallback: string)
   return match?.[1] ?? fallback;
 }
 
-/** Downloads the filled IMASUL workbook (or its PDF conversion) and triggers a browser save. */
+/** Downloads the filled IMASUL workbook and triggers a browser save. */
 export async function downloadImasulReport(params: ImasulReportParams): Promise<void> {
-  const format = params.format ?? 'xlsx';
   const url = new URL('/reports/imasul', BASE_URL);
   url.searchParams.set('item_id', params.itemId);
   url.searchParams.set('year', String(params.year));
@@ -27,7 +25,6 @@ export async function downloadImasulReport(params: ImasulReportParams): Promise<
   url.searchParams.set('data', params.data);
   if (params.observacoes) url.searchParams.set('observacoes', params.observacoes);
   if (params.barramentoDurh) url.searchParams.set('barramento_durh', params.barramentoDurh);
-  url.searchParams.set('format', format);
 
   const res = await fetch(url.toString(), { headers: await authHeader() });
   if (!res.ok) {
@@ -38,7 +35,7 @@ export async function downloadImasulReport(params: ImasulReportParams): Promise<
   const blob = await res.blob();
   const filename = filenameFromContentDisposition(
     res.headers.get('Content-Disposition'),
-    `formulario-monitoramento-${params.itemId}-${params.year}.${format}`
+    `formulario-monitoramento-${params.itemId}-${params.year}.xlsx`
   );
 
   const objectUrl = URL.createObjectURL(blob);
