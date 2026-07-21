@@ -20,7 +20,7 @@ const buttonStyle: CSSProperties = {
 const popoverStyle: CSSProperties = {
   position: 'absolute',
   top: '100%',
-  right: 0,
+  left: 0,
   marginTop: 8,
   width: 300,
   maxWidth: '80vw',
