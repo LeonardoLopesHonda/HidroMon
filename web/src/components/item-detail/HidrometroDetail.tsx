@@ -12,7 +12,7 @@ import { STATE_LABEL } from '@/components/overview/ComplianceCard';
 import { sectionStyle, sectionTitleStyle } from '@/components/item-detail/sectionStyles';
 import type { SelectedMonth } from '@/components/shared/MonthSelector';
 import { dailyPrecipitationPoints, hidrometroMonthStats, missingDailyDates } from '@/lib/metrics';
-import { formatCurrentMax, formatNumberBR, formatPercentBR } from '@/lib/format';
+import { formatMaxHint, formatNumberBR, formatPercentBR } from '@/lib/format';
 import type { MonitoredItem, Reading } from '@/types';
 
 function todayISO(): string {
@@ -87,7 +87,6 @@ export function HidrometroDetail({
   const { year, month } = selectedMonth;
   const today = todayISO();
   const stats = hidrometroMonthStats(item, readings, year, month, today);
-  const ratio = stats.cap > 0 ? stats.monthToDateConsumption / stats.cap : null;
 
   const [onlyMissingHours, setOnlyMissingHours] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -214,17 +213,19 @@ export function HidrometroDetail({
         {reportOpen && <ImasulReportDialog item={item} onClose={() => setReportOpen(false)} />}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 20 }}>
           <StatTile
-            label="Consumo do mês (atual/máx.)"
-            value={formatCurrentMax(stats.monthToDateConsumption, stats.cap, 'm³')}
-            hint={ratio != null ? `${formatPercentBR(ratio)} da outorga` : undefined}
+            label="Consumo do mês"
+            value={`${formatNumberBR(stats.monthToDateConsumption)} m³`}
+            hint={formatMaxHint(stats.cap, 'm³')}
           />
           <StatTile
-            label="Taxa diária (atual/máx.)"
-            value={formatCurrentMax(stats.latestDailyRate, stats.dailyCap, 'm³/dia')}
+            label="Taxa diária"
+            value={stats.latestDailyRate != null ? `${formatNumberBR(stats.latestDailyRate)} m³/dia` : '—'}
+            hint={formatMaxHint(stats.dailyCap, 'm³/dia')}
           />
           <StatTile
-            label="Vazão média (atual/máx.)"
-            value={formatCurrentMax(stats.latestVazaoMedia, item.limiteOutorgado ?? 0, 'm³/h')}
+            label="Vazão média"
+            value={stats.latestVazaoMedia != null ? `${formatNumberBR(stats.latestVazaoMedia)} m³/h` : '—'}
+            hint={formatMaxHint(item.limiteOutorgado ?? 0, 'm³/h')}
           />
           <StatTile
             label="Projeção"

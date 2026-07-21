@@ -11,11 +11,9 @@ export function formatPercentBR(ratio: number): string {
   return `${Math.round(ratio * 100)}%`;
 }
 
-/** "current / max unit" — max <= 0 means the limit isn't configured yet ("—" rather than a misleading "X / 0"). */
-export function formatCurrentMax(current: number | null, max: number, unit: string): string {
-  if (max <= 0) return '—';
-  const currentLabel = current != null ? formatNumberBR(current) : '—';
-  return `${currentLabel} / ${formatNumberBR(max)} ${unit}`;
+/** "máx. X unidade" hint line — undefined when max <= 0, meaning the limit isn't configured yet. */
+export function formatMaxHint(max: number, unit: string): string | undefined {
+  return max > 0 ? `máx. ${formatNumberBR(max)} ${unit}` : undefined;
 }
 
 const MONTH_NAMES_PT_BR = [
