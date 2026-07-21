@@ -24,6 +24,12 @@ function dateOf(row: GridRow): string {
   return row.kind === 'existing' ? row.reading.date : row.date;
 }
 
+// Ghost rows have no recordedAt yet (assigned at save time) and can never collide on
+// date with another row — same-day ties only happen between two existing readings.
+function recordedAtOf(row: GridRow): string {
+  return row.kind === 'existing' ? row.reading.recordedAt : '';
+}
+
 function cleanState(row: GridRow): RowEditState {
   if (row.kind === 'ghost') return { valorDraft: '', horimetroDraft: '', observacoesDraft: '', status: 'clean' };
   const { valor, horimetro } = row.reading.values;
@@ -103,7 +109,12 @@ export function useReadingEditBuffer(itemId: string, onReadingSaved: (updated: R
 
   async function save(rows: GridRow[], readings: Reading[]) {
     const dirtyRows = rows.filter(isDirty);
-    const ordered = [...dirtyRows].sort((a, b) => (dateOf(a) < dateOf(b) ? -1 : dateOf(a) > dateOf(b) ? 1 : 0));
+    const ordered = [...dirtyRows].sort((a, b) => {
+      if (dateOf(a) !== dateOf(b)) return dateOf(a) < dateOf(b) ? -1 : 1;
+      const ra = recordedAtOf(a);
+      const rb = recordedAtOf(b);
+      return ra < rb ? -1 : ra > rb ? 1 : 0;
+    });
 
     // Patched locally as each save lands, so later rows in this batch validate
     // against already-saved values rather than the stale snapshot from render start.
