@@ -246,3 +246,158 @@ def test_report_neutralizes_formula_injection_in_free_text_fields(db_session, it
     assert ws["H26"].value == "'+123"
     assert ws["A14"].value == "'-2+3"
     assert ws["D24"].value == "'@evil"
+
+
+# --- readings export ---------------------------------------------------------------
+
+
+def test_readings_export_requires_auth(client, item):
+    response = client.get(
+        "/reports/readings",
+        params={"item_id": str(item.id), "from": "2024-01-01", "to": "2024-01-31"},
+    )
+    assert response.status_code in (401, 403)
+
+
+def test_readings_export_missing_item_404(db_session):
+    with pytest.raises(HTTPException) as exc_info:
+        report_service.generate_readings_export(db_session, uuid.uuid4(), date(2024, 1, 1), date(2024, 1, 31))
+    assert exc_info.value.status_code == 404
+
+
+def test_readings_export_hidrometro_columns_and_range_filter(db_session, item):
+    db_session.add_all(
+        [
+            _reading(item.id, d=date(2024, 1, 5), valor=100.0, observacoes="Normal"),
+            _reading(item.id, d=date(2024, 1, 20), valor=150.0),
+            _reading(item.id, d=date(2024, 2, 1), valor=999.0),  # outside range — excluded
+        ]
+    )
+    db_session.flush()
+
+    content, item_name = report_service.generate_readings_export(db_session, item.id, date(2024, 1, 1), date(2024, 1, 31))
+    assert item_name == item.name
+
+    wb = openpyxl.load_workbook(io.BytesIO(content))
+    ws = wb.active
+    assert [c.value for c in ws[1]] == ["Data", "Leitura (m³)", "Observações"]
+    assert [c.value for c in ws[2]] == [datetime(2024, 1, 5), 100.0, "Normal"]
+    assert [c.value for c in ws[3]] == [datetime(2024, 1, 20), 150.0, None]
+    assert ws.max_row == 3  # header + 2 rows, February reading excluded
+
+
+def test_readings_export_hidrometro_includes_horimetro_column_when_equipped(db_session):
+    area = _area()
+    db_session.add(area)
+    db_session.flush()
+    equipped = _item(area.id, has_horimetro=True)
+    db_session.add(equipped)
+    db_session.flush()
+    db_session.add(_reading(equipped.id, d=date(2024, 1, 5), valor=100.0, horimetro=42.0))
+    db_session.flush()
+
+    content, _ = report_service.generate_readings_export(db_session, equipped.id, date(2024, 1, 1), date(2024, 1, 31))
+    wb = openpyxl.load_workbook(io.BytesIO(content))
+    ws = wb.active
+    assert [c.value for c in ws[1]] == ["Data", "Leitura (m³)", "Horímetro (h)", "Observações"]
+    assert [c.value for c in ws[2]] == [datetime(2024, 1, 5), 100.0, 42.0, None]
+
+    db_session.rollback()
+    db_session.query(Reading).filter(Reading.item_id == equipped.id).delete()
+    db_session.query(MonitoredItem).filter(MonitoredItem.id == equipped.id).delete()
+    db_session.query(Area).filter(Area.id == area.id).delete()
+    db_session.commit()
+
+
+def test_readings_export_empty_range_has_headers_no_rows(db_session, item):
+    content, _ = report_service.generate_readings_export(db_session, item.id, date(2024, 6, 1), date(2024, 6, 30))
+    wb = openpyxl.load_workbook(io.BytesIO(content))
+    ws = wb.active
+    assert [c.value for c in ws[1]] == ["Data", "Leitura (m³)", "Observações"]
+    assert ws.max_row == 1
+
+
+def test_readings_export_pluviometro_columns(db_session):
+    area = _area()
+    db_session.add(area)
+    db_session.flush()
+    pluv = _item(area.id, type="pluviometro", durh_number=None, outorga_number=None)
+    db_session.add(pluv)
+    db_session.flush()
+    db_session.add(_reading(pluv.id, d=date(2024, 3, 1), valor=12.5))
+    db_session.flush()
+
+    content, _ = report_service.generate_readings_export(db_session, pluv.id, date(2024, 3, 1), date(2024, 3, 31))
+    wb = openpyxl.load_workbook(io.BytesIO(content))
+    ws = wb.active
+    assert [c.value for c in ws[1]] == ["Data", "Leitura (mm)", "Observações"]
+    assert [c.value for c in ws[2]] == [datetime(2024, 3, 1), 12.5, None]
+
+    db_session.rollback()
+    db_session.query(Reading).filter(Reading.item_id == pluv.id).delete()
+    db_session.query(MonitoredItem).filter(MonitoredItem.id == pluv.id).delete()
+    db_session.query(Area).filter(Area.id == area.id).delete()
+    db_session.commit()
+
+
+def test_readings_export_corrego_regua_columns(db_session):
+    area = _area()
+    db_session.add(area)
+    db_session.flush()
+    corrego = _item(area.id, type="corrego", corrego_method="regua", durh_number=None, outorga_number=None)
+    db_session.add(corrego)
+    db_session.flush()
+    db_session.add(_reading(corrego.id, d=date(2024, 3, 1), valor=None, nivel=0.4, vazao=0.456))
+    db_session.flush()
+
+    content, _ = report_service.generate_readings_export(db_session, corrego.id, date(2024, 3, 1), date(2024, 3, 31))
+    wb = openpyxl.load_workbook(io.BytesIO(content))
+    ws = wb.active
+    assert [c.value for c in ws[1]] == ["Data", "Nível (m)", "Vazão (m³/s)", "Observações"]
+    assert [c.value for c in ws[2]] == [datetime(2024, 3, 1), 0.4, 0.456, None]
+
+    db_session.rollback()
+    db_session.query(Reading).filter(Reading.item_id == corrego.id).delete()
+    db_session.query(MonitoredItem).filter(MonitoredItem.id == corrego.id).delete()
+    db_session.query(Area).filter(Area.id == area.id).delete()
+    db_session.commit()
+
+
+def test_readings_export_corrego_tambor_columns(db_session):
+    area = _area()
+    db_session.add(area)
+    db_session.flush()
+    corrego = _item(area.id, type="corrego", corrego_method="tambor", durh_number=None, outorga_number=None)
+    db_session.add(corrego)
+    db_session.flush()
+    db_session.add(
+        _reading(corrego.id, d=date(2024, 3, 1), valor=None, vazao=0.222, raw_values={"t1": 10.0, "t2": 11.0, "t3": 9.0})
+    )
+    db_session.flush()
+
+    content, _ = report_service.generate_readings_export(db_session, corrego.id, date(2024, 3, 1), date(2024, 3, 31))
+    wb = openpyxl.load_workbook(io.BytesIO(content))
+    ws = wb.active
+    assert [c.value for c in ws[1]] == ["Data", "T1 (s)", "T2 (s)", "T3 (s)", "Vazão (m³/s)", "Observações"]
+    assert [c.value for c in ws[2]] == [datetime(2024, 3, 1), 10.0, 11.0, 9.0, 0.222, None]
+
+    db_session.rollback()
+    db_session.query(Reading).filter(Reading.item_id == corrego.id).delete()
+    db_session.query(MonitoredItem).filter(MonitoredItem.id == corrego.id).delete()
+    db_session.query(Area).filter(Area.id == area.id).delete()
+    db_session.commit()
+
+
+def test_readings_export_neutralizes_formula_injection_in_observacoes(db_session, item):
+    db_session.add(_reading(item.id, d=date(2024, 1, 5), valor=100.0, observacoes="=cmd|'/c calc'!A1"))
+    db_session.flush()
+
+    content, _ = report_service.generate_readings_export(db_session, item.id, date(2024, 1, 1), date(2024, 1, 31))
+    wb = openpyxl.load_workbook(io.BytesIO(content))
+    ws = wb.active
+    assert ws["C2"].value == "'=cmd|'/c calc'!A1"
+
+
+def test_export_filename_slugifies_item_name_and_range():
+    filename = report_service.export_filename("Captação Serraria", date(2024, 1, 1), date(2024, 1, 31))
+    assert filename == "leituras-captacao-serraria-2024-01-01-a-2024-01-31.xlsx"

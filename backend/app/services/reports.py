@@ -1,11 +1,13 @@
 import calendar
 import io
+import re
+import unicodedata
 import uuid
 from datetime import date as date_type
 from pathlib import Path
 
 from fastapi import HTTPException
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 from sqlalchemy.orm import Session
 
 from app.db.database import MonitoredItem, Reading
@@ -139,3 +141,91 @@ def monthly_consumption_by_month(readings: list[Reading], year: int) -> dict[int
 
         result[month] = float(last_of_month.valor) - float(baseline.valor)
     return result
+
+
+def generate_readings_export(
+    db: Session, item_id: uuid.UUID, date_from: date_type, date_to: date_type
+) -> tuple[bytes, str]:
+    """Raw readings for a single item over an arbitrary date range, as a plain
+    tabular .xlsx — distinct from the fixed-format IMASUL annual filing above.
+    Returns (file bytes, item name) so the route can build a descriptive filename.
+    """
+    item = db.query(MonitoredItem).filter(MonitoredItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail=f"MonitoredItem {item_id} not found")
+
+    readings = (
+        db.query(Reading)
+        .filter(Reading.item_id == item_id, Reading.date >= date_from, Reading.date <= date_to)
+        .order_by(Reading.date, Reading.recorded_at)
+        .all()
+    )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Leituras"
+
+    headers, rows = _readings_export_rows(item, readings)
+    ws.append(headers)
+    for row in rows:
+        ws.append(row)
+    for col in range(1, len(headers) + 1):
+        ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = 16
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue(), item.name
+
+
+def _readings_export_rows(item: MonitoredItem, readings: list[Reading]) -> tuple[list[str], list[list]]:
+    if item.type == "hidrometro":
+        headers = ["Data", "Leitura (m³)"]
+        if item.has_horimetro:
+            headers.append("Horímetro (h)")
+        headers.append("Observações")
+        rows = []
+        for r in readings:
+            row: list = [r.date, _num(r.valor)]
+            if item.has_horimetro:
+                row.append(_num(r.horimetro))
+            row.append(_safe_text(r.observacoes) if r.observacoes else None)
+            rows.append(row)
+        return headers, rows
+
+    if item.type == "pluviometro":
+        headers = ["Data", "Leitura (mm)", "Observações"]
+        rows = [[r.date, _num(r.valor), _safe_text(r.observacoes) if r.observacoes else None] for r in readings]
+        return headers, rows
+
+    if item.type == "corrego":
+        if item.corrego_method == "tambor":
+            headers = ["Data", "T1 (s)", "T2 (s)", "T3 (s)", "Vazão (m³/s)", "Observações"]
+            rows = []
+            for r in readings:
+                raw = r.raw_values or {}
+                rows.append(
+                    [r.date, raw.get("t1"), raw.get("t2"), raw.get("t3"), _num(r.vazao), _safe_text(r.observacoes) if r.observacoes else None]
+                )
+            return headers, rows
+
+        # régua (or no method recorded — same shape, values simply absent)
+        headers = ["Data", "Nível (m)", "Vazão (m³/s)", "Observações"]
+        rows = [
+            [r.date, _num(r.nivel), _num(r.vazao), _safe_text(r.observacoes) if r.observacoes else None] for r in readings
+        ]
+        return headers, rows
+
+    raise HTTPException(status_code=422, detail=f"Tipo de item não suportado para exportação: {item.type}")
+
+
+def _num(value: float | None) -> float | None:
+    return float(value) if value is not None else None
+
+
+def export_filename(item_name: str, date_from: date_type, date_to: date_type) -> str:
+    return f"leituras-{_slugify(item_name)}-{date_from.isoformat()}-a-{date_to.isoformat()}.xlsx"
+
+
+def _slugify(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-zA-Z0-9]+", "-", normalized).strip("-").lower()
