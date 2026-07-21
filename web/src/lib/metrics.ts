@@ -212,31 +212,92 @@ export interface HorimetroBounds {
   upper: number | null;
 }
 
-/**
- * Mirrors the server's neighbor-bounded horímetro check
- * (backend `_horimetro_bounds`): nearest earlier/later reading that carries
- * hours, skipping blanks, ordered by (date, recordedAt) same as the server —
- * `date` alone isn't enough since same-day readings need the tiebreak.
- */
-export function horimetroBounds(readings: Reading[], targetReadingId: string): HorimetroBounds {
-  const target = readings.find((r) => r.id === targetReadingId);
-  if (!target) return { lower: null, upper: null };
+type BoundedField = 'valor' | 'horimetro';
 
-  const withHours = sortByDateAndRecordedAt(
-    readings.filter((r) => r.id !== targetReadingId && r.values.horimetro != null)
+/**
+ * Mirrors the server's neighbor-bounded checks (backend `_neighbor_bounds`):
+ * nearest earlier/later reading that carries a value in `field`, skipping
+ * blanks, ordered by (date, recordedAt) same as the server — `date` alone
+ * isn't enough since same-day readings need the tiebreak. `excludeId` omits
+ * the reading being edited from its own bounds; omit it entirely for a
+ * not-yet-created (ghost) date, which by construction has no same-day
+ * reading to tie-break against.
+ */
+function fieldNeighborBounds(
+  readings: Reading[],
+  field: BoundedField,
+  target: { date: string; recordedAt: string },
+  excludeId?: string
+): HorimetroBounds {
+  const withField = sortByDateAndRecordedAt(
+    readings.filter((r) => r.id !== excludeId && r.values[field] != null)
   );
   const isBefore = (r: Reading) =>
     r.date < target.date || (r.date === target.date && r.recordedAt < target.recordedAt);
   const isAfter = (r: Reading) =>
     r.date > target.date || (r.date === target.date && r.recordedAt > target.recordedAt);
 
-  const earlier = [...withHours].reverse().find(isBefore);
-  const later = withHours.find(isAfter);
+  const earlier = [...withField].reverse().find(isBefore);
+  const later = withField.find(isAfter);
 
   return {
-    lower: earlier ? earlier.values.horimetro! : null,
-    upper: later ? later.values.horimetro! : null,
+    lower: earlier ? earlier.values[field]! : null,
+    upper: later ? later.values[field]! : null,
   };
+}
+
+export function horimetroBounds(readings: Reading[], targetReadingId: string): HorimetroBounds {
+  const target = readings.find((r) => r.id === targetReadingId);
+  if (!target) return { lower: null, upper: null };
+  return fieldNeighborBounds(readings, 'horimetro', target, targetReadingId);
+}
+
+export function valorBoundsForReading(readings: Reading[], targetReadingId: string): HorimetroBounds {
+  const target = readings.find((r) => r.id === targetReadingId);
+  if (!target) return { lower: null, upper: null };
+  return fieldNeighborBounds(readings, 'valor', target, targetReadingId);
+}
+
+/** Same neighbor-bounded rule, for a date that has no reading yet (a ghost day being filled in). */
+export function fieldBoundsForNewDate(readings: Reading[], field: BoundedField, date: string): HorimetroBounds {
+  return fieldNeighborBounds(readings, field, { date, recordedAt: `${date}T12:00:00.000Z` });
+}
+
+function daysInCalendarMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+function monthIndex(year: number, month: number): number {
+  return year * 12 + month;
+}
+
+/**
+ * Calendar days a daily-cadence Área expects a reading on, within the given
+ * month — every day except Sunday (CONTEXT.md → diasSemLeitura), using
+ * actual calendar days, not the outorga's fixed 30-day convention (which is
+ * a separate, deliberately different, convention — see CONTEXT.md). Capped
+ * at today for the current month; empty for a month that hasn't started.
+ */
+export function expectedDailyDates(year: number, month: number, todayISO: string): string[] {
+  const [todayYear, todayMonth, todayDay] = todayISO.split('-').map(Number);
+  if (monthIndex(year, month) > monthIndex(todayYear, todayMonth)) return [];
+
+  const totalDays = daysInCalendarMonth(year, month);
+  const lastDay =
+    monthIndex(year, month) === monthIndex(todayYear, todayMonth) ? Math.min(todayDay, totalDays) : totalDays;
+
+  const dates: string[] = [];
+  for (let day = 1; day <= lastDay; day++) {
+    const isSunday = new Date(Date.UTC(year, month - 1, day)).getUTCDay() === 0;
+    if (!isSunday) dates.push(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+  }
+  return dates;
+}
+
+/** Expected daily-cadence dates with no reading at all — the "ghost day" gaps to backfill. */
+export function missingDailyDates(readings: Reading[], year: number, month: number, todayISO: string): string[] {
+  const present = new Set(readings.map((r) => r.date));
+  return expectedDailyDates(year, month, todayISO).filter((d) => !present.has(d));
 }
 
 /** `lastHorímetro − firstHorímetro` within the month. Null when no horímetro data exists that month. */

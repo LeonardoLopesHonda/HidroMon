@@ -5,15 +5,19 @@ import {
   daysElapsedInMonth,
   dailyRate,
   exceedanceChecks,
+  expectedDailyDates,
+  fieldBoundsForNewDate,
   hidrometroMonthStats,
   horasOperadas,
   horimetroBounds,
   measuredHoursPerDay,
+  missingDailyDates,
   monthEndProjection,
   monthlyCap,
   monthlyConsumption,
   monthlyPrecipitationTotals,
   nextMonthStartISO,
+  valorBoundsForReading,
   vazaoEfetivaHorimetro,
   vazaoMediaOutorga,
   vazaoMediaOutorgaSeries,
@@ -309,6 +313,61 @@ describe('horimetroBounds', () => {
     const target = reading('2026-07-10', 1040, 530);
     const readings = [reading('2026-07-01', 1000, 500), target, reading('2026-07-20', 1080, 560)];
     expect(horimetroBounds(readings, target.id)).toEqual({ lower: 500, upper: 560 });
+  });
+});
+
+describe('valorBoundsForReading', () => {
+  it('bounds a mid-sequence valor by its chronological neighbors, same rule as the server', () => {
+    const target = reading('2026-07-10', 1040);
+    const readings = [reading('2026-07-01', 1000), target, reading('2026-07-20', 1080)];
+    expect(valorBoundsForReading(readings, target.id)).toEqual({ lower: 1000, upper: 1080 });
+  });
+});
+
+describe('fieldBoundsForNewDate', () => {
+  it('bounds a not-yet-created valor by its chronological neighbors', () => {
+    const readings = [reading('2026-07-01', 1000), reading('2026-07-20', 1080)];
+    expect(fieldBoundsForNewDate(readings, 'valor', '2026-07-10')).toEqual({ lower: 1000, upper: 1080 });
+  });
+
+  it('has no upper bound past the end of history', () => {
+    const readings = [reading('2026-07-01', 1000)];
+    expect(fieldBoundsForNewDate(readings, 'valor', '2026-07-10')).toEqual({ lower: 1000, upper: null });
+  });
+
+  it('bounds horímetro the same way, skipping blanks', () => {
+    const readings = [
+      reading('2026-07-01', 1000, 500),
+      reading('2026-07-05', 1010), // blank horímetro — skipped
+      reading('2026-07-20', 1080, 560),
+    ];
+    expect(fieldBoundsForNewDate(readings, 'horimetro', '2026-07-10')).toEqual({ lower: 500, upper: 560 });
+  });
+});
+
+describe('expectedDailyDates', () => {
+  it('excludes Sundays for a past month', () => {
+    const dates = expectedDailyDates(2026, 6, '2026-07-21');
+    expect(dates).toHaveLength(26); // 30 days in June minus 4 Sundays
+    expect(dates).not.toContain('2026-06-07');
+    expect(dates).not.toContain('2026-06-14');
+  });
+
+  it('caps at today for the current month', () => {
+    const dates = expectedDailyDates(2026, 7, '2026-07-21');
+    expect(dates[dates.length - 1]).toBe('2026-07-21');
+    expect(dates).not.toContain('2026-07-22');
+  });
+
+  it('is empty for a month that has not started yet', () => {
+    expect(expectedDailyDates(2026, 8, '2026-07-21')).toEqual([]);
+  });
+});
+
+describe('missingDailyDates', () => {
+  it('excludes dates that already have a reading', () => {
+    const readings = [reading('2026-07-01', 1000), reading('2026-07-02', 1010)];
+    expect(missingDailyDates(readings, 2026, 7, '2026-07-03')).toEqual(['2026-07-03']);
   });
 });
 

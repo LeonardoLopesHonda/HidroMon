@@ -61,8 +61,9 @@ export function ItemDetailPage() {
     [readings, pluviometro],
   );
 
+  // Upsert: a ghost-day backfill creates a reading with an id not yet in state.
   const handleReadingUpdated = useCallback((updated: Reading) => {
-    setReadings((rs) => rs.map((r) => (r.id === updated.id ? updated : r)));
+    setReadings((rs) => (rs.some((r) => r.id === updated.id) ? rs.map((r) => (r.id === updated.id ? updated : r)) : [...rs, updated]));
   }, []);
 
   return (

@@ -35,10 +35,13 @@ export function ReadingHistoryTable({
   columns,
   rows,
   footer,
+  rowStyle,
 }: {
   columns: ReadingHistoryColumn[];
   rows: Reading[];
   footer?: ReactNode;
+  /** Optional per-row style override — e.g. dimming a placeholder row for a day with no reading yet. */
+  rowStyle?: (reading: Reading) => CSSProperties | undefined;
 }) {
   const sorted = sortNewestFirst(rows);
 
@@ -65,7 +68,7 @@ export function ReadingHistoryTable({
               </tr>
             )}
             {sorted.map((r) => (
-              <tr key={r.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
+              <tr key={r.id} style={{ borderTop: '1px solid var(--color-border-light)', ...rowStyle?.(r) }}>
                 <td style={tdStyle}>{formatDateBR(r.date)}</td>
                 {columns.map((c) => (
                   <td key={c.key} style={tdStyle}>
