@@ -5,7 +5,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.db.database import Area, MonitoredItem, Reading
-from app.models.reading import ReadingUpdate, ReadingValues
+from app.models.reading import ReadingCreate, ReadingUpdate, ReadingValues
 from app.services import readings as reading_service
 
 
@@ -134,6 +134,78 @@ def test_horimetro_within_bounds_saves(db_session, item):
 
     db_session.refresh(target)
     assert float(target.horimetro) == 55.0
+
+
+def test_valor_below_earlier_neighbor_rejected(db_session, item):
+    earlier = _reading(item.id, day_offset=0, valor=100.0)
+    target = _reading(item.id, day_offset=1, valor=105.0)
+    db_session.add_all([earlier, target])
+    db_session.flush()
+
+    with pytest.raises(HTTPException) as exc_info:
+        _update(db_session, target, valor=90.0)
+    assert exc_info.value.status_code == 422
+
+
+def test_valor_above_later_neighbor_rejected(db_session, item):
+    target = _reading(item.id, day_offset=0, valor=100.0)
+    later = _reading(item.id, day_offset=1, valor=105.0)
+    db_session.add_all([target, later])
+    db_session.flush()
+
+    # Previously unchecked: valor was only bounded against the prior reading, so a
+    # mid-sequence backfill could silently exceed a reading that already exists later.
+    with pytest.raises(HTTPException) as exc_info:
+        _update(db_session, target, valor=110.0)
+    assert exc_info.value.status_code == 422
+
+
+def test_valor_backfill_within_bounds_saves(db_session, item):
+    earlier = _reading(item.id, day_offset=0, valor=100.0)
+    target = _reading(item.id, day_offset=1, valor=100.0)
+    later = _reading(item.id, day_offset=2, valor=110.0)
+    db_session.add_all([earlier, target, later])
+    db_session.flush()
+
+    _update(db_session, target, valor=105.0)
+
+    db_session.refresh(target)
+    assert float(target.valor) == 105.0
+
+
+def test_valor_backfill_via_create_within_bounds(db_session, item):
+    earlier = _reading(item.id, day_offset=0, valor=100.0)
+    later = _reading(item.id, day_offset=2, valor=110.0)
+    db_session.add_all([earlier, later])
+    db_session.flush()
+
+    data = ReadingCreate(
+        id=uuid.uuid4(),
+        item_id=item.id,
+        date=date(2026, 7, 2),
+        recorded_at=datetime(2026, 7, 2, 12, tzinfo=timezone.utc),
+        values=ReadingValues(valor=105.0),
+    )
+    created = reading_service.create_reading(db_session, data, uuid.uuid4())
+    assert created.values.valor == 105.0
+
+
+def test_valor_backfill_via_create_above_later_rejected(db_session, item):
+    earlier = _reading(item.id, day_offset=0, valor=100.0)
+    later = _reading(item.id, day_offset=2, valor=110.0)
+    db_session.add_all([earlier, later])
+    db_session.flush()
+
+    data = ReadingCreate(
+        id=uuid.uuid4(),
+        item_id=item.id,
+        date=date(2026, 7, 2),
+        recorded_at=datetime(2026, 7, 2, 12, tzinfo=timezone.utc),
+        values=ReadingValues(valor=115.0),
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        reading_service.create_reading(db_session, data, uuid.uuid4())
+    assert exc_info.value.status_code == 422
 
 
 def test_neighbors_without_hours_are_skipped(db_session, item):

@@ -142,22 +142,28 @@ def _assert_monotonic(
 ) -> None:
     """Cumulative counters must stay non-decreasing chronologically.
 
-    m³ (`valor`) is captured newest-last, so it's only checked against the immediately
-    prior reading. `horimetro` is sparse and backfilled out of order, so it's bounded by
-    its nearest *filled* neighbour on each side (blank horímetros are skipped)."""
+    Both `valor` and `horimetro` are bounded by their nearest *filled* neighbour on
+    each side (blank values are skipped) — not just the immediately prior reading —
+    because the web dashboard can backfill a reading out of chronological order
+    (e.g. filling a gap day after later readings already exist)."""
     if item.type != "hidrometro":
         return
 
     if valor is not None:
-        prior = _prior_reading(db, item.id, new_date, new_recorded_at, exclude_id)
-        if prior is not None and prior.valor is not None and valor < float(prior.valor):
+        lower, upper = _neighbor_bounds(db, item.id, Reading.valor, new_date, new_recorded_at, exclude_id)
+        if lower is not None and valor < lower:
             raise HTTPException(
                 status_code=422,
-                detail=f"Valor menor que leitura anterior: {prior.valor} m³",
+                detail=f"Valor menor que leitura anterior: {lower} m³",
+            )
+        if upper is not None and valor > upper:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Valor maior que leitura posterior: {upper} m³",
             )
 
     if horimetro is not None:
-        lower, upper = _horimetro_bounds(db, item.id, new_date, new_recorded_at, exclude_id)
+        lower, upper = _neighbor_bounds(db, item.id, Reading.horimetro, new_date, new_recorded_at, exclude_id)
         if lower is not None and horimetro < lower:
             raise HTTPException(
                 status_code=422,
@@ -170,39 +176,16 @@ def _assert_monotonic(
             )
 
 
-def _prior_reading(
+def _neighbor_bounds(
     db: Session,
     item_id: uuid.UUID,
-    new_date: date_type,
-    new_recorded_at: datetime,
-    exclude_id: uuid.UUID | None,
-) -> Reading | None:
-    q = (
-        db.query(Reading)
-        .filter(Reading.item_id == item_id)
-        .filter(
-            or_(
-                Reading.date < new_date,
-                and_(Reading.date == new_date, Reading.recorded_at < new_recorded_at),
-            )
-        )
-    )
-    if exclude_id is not None:
-        q = q.filter(Reading.id != exclude_id)
-    return q.order_by(Reading.date.desc(), Reading.recorded_at.desc()).first()
-
-
-def _horimetro_bounds(
-    db: Session,
-    item_id: uuid.UUID,
+    column,
     new_date: date_type,
     new_recorded_at: datetime,
     exclude_id: uuid.UUID | None,
 ) -> tuple[float | None, float | None]:
-    """Nearest earlier / later readings that actually carry a horímetro."""
-    base = db.query(Reading).filter(
-        Reading.item_id == item_id, Reading.horimetro.isnot(None)
-    )
+    """Nearest earlier / later readings that actually carry a value in `column`."""
+    base = db.query(Reading).filter(Reading.item_id == item_id, column.isnot(None))
     if exclude_id is not None:
         base = base.filter(Reading.id != exclude_id)
 
@@ -226,8 +209,10 @@ def _horimetro_bounds(
         .order_by(Reading.date.asc(), Reading.recorded_at.asc())
         .first()
     )
-    lower = float(earlier.horimetro) if earlier and earlier.horimetro is not None else None
-    upper = float(later.horimetro) if later and later.horimetro is not None else None
+    lower_value = getattr(earlier, column.key) if earlier is not None else None
+    upper_value = getattr(later, column.key) if later is not None else None
+    lower = float(lower_value) if lower_value is not None else None
+    upper = float(upper_value) if upper_value is not None else None
     return lower, upper
 
 
