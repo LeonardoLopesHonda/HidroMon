@@ -1,6 +1,8 @@
 import { Badge } from '@/components/ui/Badge';
+import { InfoPopover } from '@/components/ui/InfoPopover';
 import { ReadingHistoryTable, type ReadingHistoryColumn } from '@/components/item-detail/ReadingHistoryTable';
 import { SingleSeriesLineChart } from '@/components/item-detail/charts/SingleSeriesLineChart';
+import { VazaoCorregoExplanation } from '@/components/item-detail/chartExplanations';
 import { sectionStyle, sectionTitleStyle } from '@/components/item-detail/sectionStyles';
 import type { SelectedMonth } from '@/components/shared/MonthSelector';
 import { isInMonth, sortByDateAndRecordedAt } from '@/lib/metrics';
@@ -63,7 +65,12 @@ export function CorregoDetail({ item, readings, selectedMonth }: { item: Monitor
       )}
 
       <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Vazão</h3>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <h3 style={{ ...sectionTitleStyle, margin: 0 }}>Vazão</h3>
+          <InfoPopover label="Como a vazão é calculada">
+            <VazaoCorregoExplanation method={item.corregoMethod} />
+          </InfoPopover>
+        </span>
         <SingleSeriesLineChart
           points={vazaoPoints}
           label="Vazão"

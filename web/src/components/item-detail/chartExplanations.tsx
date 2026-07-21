@@ -56,3 +56,20 @@ export function ComparativoMensalExplanation() {
     </p>
   );
 }
+
+export function VazaoCorregoExplanation({ method }: { method: 'regua' | 'tambor' | null }) {
+  if (method === 'tambor') {
+    return (
+      <p style={lastP}>
+        O operador nunca digita a vazão — ela é calculada pelo servidor a partir de três cronometragens (t1, t2, t3) do tempo para encher
+        o mesmo balde de 200 L: <em>vazão = 0,2 ÷ média(t1, t2, t3)</em> (m³/s). As três amostras existem para reduzir erro de medição.
+      </p>
+    );
+  }
+  return (
+    <p style={lastP}>
+      O operador nunca digita a vazão — ela é calculada pelo servidor a partir do nível medido na régua, pela fórmula do vertedor
+      retangular de crista viva: <em>vazão = 1,8 × 0,6 × nível^1,5</em> (m³/s).
+    </p>
+  );
+}
