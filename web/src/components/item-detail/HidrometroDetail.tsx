@@ -12,7 +12,7 @@ import { STATE_LABEL } from '@/components/overview/ComplianceCard';
 import { sectionStyle, sectionTitleStyle } from '@/components/item-detail/sectionStyles';
 import type { SelectedMonth } from '@/components/shared/MonthSelector';
 import { dailyPrecipitationPoints, hidrometroMonthStats } from '@/lib/metrics';
-import { formatNumberBR, formatPercentBR } from '@/lib/format';
+import { formatCurrentMax, formatNumberBR, formatPercentBR } from '@/lib/format';
 import type { MonitoredItem, Reading } from '@/types';
 
 function todayISO(): string {
@@ -109,14 +109,24 @@ export function HidrometroDetail({
         </div>
         {reportOpen && <ImasulReportDialog item={item} onClose={() => setReportOpen(false)} />}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 20 }}>
-          <StatTile label="Consumo do mês" value={`${formatNumberBR(stats.monthToDateConsumption)} m³`} />
-          <StatTile label="% da outorga" value={ratio != null ? formatPercentBR(ratio) : '—'} />
+          <StatTile
+            label="Consumo do mês (atual/máx.)"
+            value={formatCurrentMax(stats.monthToDateConsumption, stats.cap, 'm³')}
+            hint={ratio != null ? `${formatPercentBR(ratio)} da outorga` : undefined}
+          />
+          <StatTile
+            label="Taxa diária (atual/máx.)"
+            value={formatCurrentMax(stats.latestDailyRate, stats.dailyCap, 'm³/dia')}
+          />
+          <StatTile
+            label="Vazão média (atual/máx.)"
+            value={formatCurrentMax(stats.latestVazaoMedia, item.limiteOutorgado ?? 0, 'm³/h')}
+          />
           <StatTile
             label="Projeção"
             value={`${formatNumberBR(stats.projection)} m³`}
             hint={stats.cap > 0 ? `${formatPercentBR(stats.projection / stats.cap)} da outorga` : undefined}
           />
-          <StatTile label="Vazão média" value={stats.latestVazaoMedia != null ? `${formatNumberBR(stats.latestVazaoMedia)} m³/h` : '—'} />
           {stats.monthHoras != null && <StatTile label="Horas operadas" value={`${formatNumberBR(stats.monthHoras)} h`} />}
         </div>
       </div>
