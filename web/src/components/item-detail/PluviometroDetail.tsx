@@ -1,7 +1,9 @@
 import { StatTile } from '@/components/item-detail/StatTile';
+import { InfoPopover } from '@/components/ui/InfoPopover';
 import { ReadingHistoryTable, type ReadingHistoryColumn } from '@/components/item-detail/ReadingHistoryTable';
 import { PrecipitationBarChart } from '@/components/item-detail/charts/PrecipitationBarChart';
 import { YearlyPrecipitationSummary } from '@/components/item-detail/charts/YearlyPrecipitationSummary';
+import { ComparativoMensalExplanation } from '@/components/item-detail/chartExplanations';
 import { sectionStyle, sectionTitleStyle } from '@/components/item-detail/sectionStyles';
 import type { SelectedMonth } from '@/components/shared/MonthSelector';
 import { dailyPrecipitationPoints, isInMonth, monthlyPrecipitationTotals } from '@/lib/metrics';
@@ -34,7 +36,12 @@ export function PluviometroDetail({ readings, selectedMonth }: { readings: Readi
       </div>
 
       <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Comparativo mensal ({year})</h3>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <h3 style={{ ...sectionTitleStyle, margin: 0 }}>Comparativo mensal ({year})</h3>
+          <InfoPopover label="Como o comparativo mensal é calculado">
+            <ComparativoMensalExplanation />
+          </InfoPopover>
+        </span>
         <YearlyPrecipitationSummary points={yearlyTotals} selectedMonth={month} />
       </div>
 

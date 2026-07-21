@@ -1,6 +1,8 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import { Badge } from '@/components/ui/Badge';
+import { InfoPopover } from '@/components/ui/InfoPopover';
 import { ImasulReportDialog } from '@/components/item-detail/ImasulReportDialog';
+import { ConsumoAcumuladoExplanation, TaxaDiariaExplanation, VazaoExplanation } from '@/components/item-detail/chartExplanations';
 import { StatTile } from '@/components/item-detail/StatTile';
 import { ReadingHistoryTable, type ReadingHistoryColumn } from '@/components/item-detail/ReadingHistoryTable';
 import { NumericCell } from '@/components/item-detail/NumericCell';
@@ -256,7 +258,12 @@ export function HidrometroDetail({
 
       <div style={sectionStyle}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
-          <h3 style={{ ...sectionTitleStyle, margin: 0 }}>Taxa diária</h3>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h3 style={{ ...sectionTitleStyle, margin: 0 }}>Taxa diária</h3>
+            <InfoPopover label="O que é a taxa diária">
+              <TaxaDiariaExplanation />
+            </InfoPopover>
+          </span>
           {pluviometro && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, font: '400 12.5px var(--font-sans)', color: 'var(--color-text-muted)' }}>
               <input type="checkbox" checked={showRain} onChange={(e) => setShowRain(e.target.checked)} />
@@ -268,12 +275,22 @@ export function HidrometroDetail({
       </div>
 
       <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Vazão</h3>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <h3 style={{ ...sectionTitleStyle, margin: 0 }}>Vazão</h3>
+          <InfoPopover label="O que é vazão média e vazão efetiva">
+            <VazaoExplanation />
+          </InfoPopover>
+        </span>
         <VazaoMediaChart vazaoMediaSeries={stats.vazaoMediaSeries} vazaoEfetivaSeries={stats.vazaoEfetivaSeries} limiteOutorgado={item.limiteOutorgado} />
       </div>
 
       <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Consumo acumulado</h3>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <h3 style={{ ...sectionTitleStyle, margin: 0 }}>Consumo acumulado</h3>
+          <InfoPopover label="O que é o consumo acumulado e o ritmo da outorga">
+            <ConsumoAcumuladoExplanation />
+          </InfoPopover>
+        </span>
         <CumulativeConsumptionChart readings={readings} year={year} month={month} cap={stats.cap} />
       </div>
 
