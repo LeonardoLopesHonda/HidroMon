@@ -321,11 +321,26 @@ export function missingDailyDates(readings: Reading[], year: number, month: numb
   return allDailyDates(year, month, todayISO).filter((d) => !present.has(d));
 }
 
+export type BackfillMethod = 'interpolated' | 'carried';
+
+export interface BackfillEstimate {
+  valor: number;
+  method: BackfillMethod;
+}
+
 /**
- * Fixed observação recorded on a "Retroativo" backfilled ghost day, so the
- * record is explicit that the value wasn't read off the physical meter.
+ * Nearest readings with a `valor` before/after a ghost date, tie-broken by
+ * (date, recordedAt) same as `fieldNeighborBounds` — a same-day correction
+ * must resolve by time-of-day, not array order (see `e8d319f`, which fixed
+ * this exact class of bug for batch-save ordering).
  */
-export const BACKFILL_OBSERVACAO = 'Leitura não realizada fisicamente (domingo/feriado) — valor estimado por interpolação.';
+function valorNeighbors(readings: Reading[], date: string): { before: Reading | null; after: Reading | null } {
+  const target = { date, recordedAt: `${date}T12:00:00.000Z` };
+  const withValor = sortByDateAndRecordedAt(readings.filter((r) => r.values.valor != null));
+  const isBefore = (r: Reading) => r.date < target.date || (r.date === target.date && r.recordedAt < target.recordedAt);
+  const isAfter = (r: Reading) => r.date > target.date || (r.date === target.date && r.recordedAt > target.recordedAt);
+  return { before: [...withValor].reverse().find(isBefore) ?? null, after: withValor.find(isAfter) ?? null };
+}
 
 /**
  * Estimate for a ghost day's `valor`, from the nearest chronological readings
@@ -334,23 +349,40 @@ export const BACKFILL_OBSERVACAO = 'Leitura não realizada fisicamente (domingo/
  * it covers, never dumped as a spike) rather than a plain midpoint — so a
  * ghost day sitting closer to one neighbor gets an estimate closer to that
  * neighbor's value. Falls back to carrying the single known neighbor forward
- * (or back) when only one side exists, and returns `null` when neither does
- * (a ghost date outside all recorded history).
+ * (or back) when only one side exists — the `method` is reported alongside
+ * the value so callers never describe a carried-forward value as
+ * "interpolated". Returns `null` when neither neighbor exists (a ghost date
+ * outside all recorded history).
  */
-export function estimateBackfillValor(readings: Reading[], date: string): number | null {
-  const withValor = sortByDate(readings.filter((r) => r.values.valor != null));
-  const before = [...withValor].reverse().find((r) => r.date < date);
-  const after = withValor.find((r) => r.date > date);
+export function estimateBackfillValor(readings: Reading[], date: string): BackfillEstimate | null {
+  const { before, after } = valorNeighbors(readings, date);
 
   if (before && after) {
     const span = daysBetween(before.date, after.date);
     const elapsed = daysBetween(before.date, date);
     const rate = (after.values.valor! - before.values.valor!) / span;
-    return Math.round((before.values.valor! + rate * elapsed) * 100) / 100;
+    return { valor: Math.round((before.values.valor! + rate * elapsed) * 100) / 100, method: 'interpolated' };
   }
-  if (before) return before.values.valor!;
-  if (after) return after.values.valor!;
+  if (before) return { valor: before.values.valor!, method: 'carried' };
+  if (after) return { valor: after.values.valor!, method: 'carried' };
   return null;
+}
+
+/**
+ * Observação recorded on a "Retroativo" backfilled ghost day, so the record
+ * is explicit that the value wasn't read off the physical meter — and honest
+ * about how it was estimated (never claims interpolation for a carried-over
+ * value, and never claims a specific day-of-week reason the button doesn't
+ * actually check — see PR #33 review).
+ */
+export function backfillObservacao(estimate: BackfillEstimate | null): string {
+  if (estimate?.method === 'interpolated') {
+    return 'Leitura não realizada fisicamente — valor estimado por interpolação entre leituras vizinhas.';
+  }
+  if (estimate?.method === 'carried') {
+    return 'Leitura não realizada fisicamente — valor estimado a partir da leitura vizinha mais próxima.';
+  }
+  return 'Leitura não realizada fisicamente — sem leituras vizinhas para estimar o valor.';
 }
 
 /** `lastHorímetro − firstHorímetro` within the month. Null when no horímetro data exists that month. */

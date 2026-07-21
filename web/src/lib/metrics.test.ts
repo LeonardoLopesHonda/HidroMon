@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Reading } from '@/types';
 import {
   allDailyDates,
+  backfillObservacao,
   cumulativeConsumptionSeries,
   daysElapsedInMonth,
   dailyRate,
@@ -402,21 +403,50 @@ describe('estimateBackfillValor', () => {
   it('interpolates by elapsed days between the surrounding readings', () => {
     const readings = [reading('2026-07-03', 1000), reading('2026-07-08', 1050)];
     // 2 of the 5 days elapsed since the earlier reading -> 2/5 of the 50 m³ delta
-    expect(estimateBackfillValor(readings, '2026-07-05')).toBe(1020);
+    expect(estimateBackfillValor(readings, '2026-07-05')).toEqual({ valor: 1020, method: 'interpolated' });
   });
 
   it('carries the earlier reading forward when there is no later neighbor', () => {
     const readings = [reading('2026-07-03', 1000)];
-    expect(estimateBackfillValor(readings, '2026-07-05')).toBe(1000);
+    expect(estimateBackfillValor(readings, '2026-07-05')).toEqual({ valor: 1000, method: 'carried' });
   });
 
   it('carries the later reading back when there is no earlier neighbor', () => {
     const readings = [reading('2026-07-08', 1050)];
-    expect(estimateBackfillValor(readings, '2026-07-05')).toBe(1050);
+    expect(estimateBackfillValor(readings, '2026-07-05')).toEqual({ valor: 1050, method: 'carried' });
   });
 
   it('returns null when there is no reading at all', () => {
     expect(estimateBackfillValor([], '2026-07-05')).toBeNull();
+  });
+
+  it('breaks a same-day tie by recordedAt, not array order', () => {
+    // Two valor readings both dated 2026-07-03 (a same-day correction) — the later
+    // recordedAt must win as the "before" neighbor, regardless of array position.
+    const readings = [
+      reading('2026-07-03', 900, undefined, '2026-07-03T08:00:00Z'),
+      reading('2026-07-03', 1000, undefined, '2026-07-03T18:00:00Z'),
+      reading('2026-07-08', 1050),
+    ];
+    expect(estimateBackfillValor(readings, '2026-07-05')).toEqual({ valor: 1020, method: 'interpolated' });
+  });
+});
+
+describe('backfillObservacao', () => {
+  it('describes interpolation without asserting a day-of-week reason', () => {
+    expect(backfillObservacao({ valor: 1020, method: 'interpolated' })).toBe(
+      'Leitura não realizada fisicamente — valor estimado por interpolação entre leituras vizinhas.'
+    );
+  });
+
+  it('describes a carried-forward value distinctly from an interpolated one', () => {
+    expect(backfillObservacao({ valor: 1000, method: 'carried' })).toBe(
+      'Leitura não realizada fisicamente — valor estimado a partir da leitura vizinha mais próxima.'
+    );
+  });
+
+  it('describes the no-neighbors case when there is nothing to estimate from', () => {
+    expect(backfillObservacao(null)).toBe('Leitura não realizada fisicamente — sem leituras vizinhas para estimar o valor.');
   });
 });
 

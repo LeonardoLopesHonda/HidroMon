@@ -144,7 +144,7 @@ export function HidrometroDetail({
               <button
                 type="button"
                 onClick={() => editBuffer.backfillGhost(r.date, readings)}
-                title="Retroativo: preencher com valor estimado e observação automática (domingo/feriado)"
+                title="Retroativo: uso para domingos/feriados sem visita — preenche valor estimado e observação"
                 style={ghostBackfillButtonStyle}
               >
                 Retroativo
