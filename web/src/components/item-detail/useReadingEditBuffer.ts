@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { createReading, updateReading } from '@/lib/api/resources';
 import { ApiError } from '@/lib/api/client';
-import { fieldBoundsForNewDate, horimetroBounds, valorBoundsForReading } from '@/lib/metrics';
+import { BACKFILL_OBSERVACAO, estimateBackfillValor, fieldBoundsForNewDate, horimetroBounds, valorBoundsForReading } from '@/lib/metrics';
 import type { CellStatus } from '@/components/item-detail/NumericCell';
 import type { Reading } from '@/types';
 
@@ -77,6 +77,23 @@ export function useReadingEditBuffer(itemId: string, onReadingSaved: (updated: R
   const activateGhost = (date: string) => {
     const key = `ghost:${date}`;
     setBuffer((b) => (key in b ? b : { ...b, [key]: { valorDraft: '', horimetroDraft: '', observacoesDraft: '', status: 'clean' } }));
+  };
+
+  // "Retroativo": prefills a Sunday/holiday ghost row with an estimated valor and a
+  // fixed observação, rather than leaving the day absent from the record. Still lands
+  // in the buffer as 'dirty' — it's a draft like any other, saved via the normal flow.
+  const backfillGhost = (date: string, readings: Reading[]) => {
+    const key = `ghost:${date}`;
+    const estimate = estimateBackfillValor(readings, date);
+    setBuffer((b) => ({
+      ...b,
+      [key]: {
+        valorDraft: estimate != null ? String(estimate) : '',
+        horimetroDraft: b[key]?.horimetroDraft ?? '',
+        observacoesDraft: BACKFILL_OBSERVACAO,
+        status: 'dirty',
+      },
+    }));
   };
 
   const setValorDraft = (row: GridRow, value: string) => {
@@ -198,5 +215,5 @@ export function useReadingEditBuffer(itemId: string, onReadingSaved: (updated: R
     }
   }
 
-  return { getState, isActivated, activateGhost, setValorDraft, setHorimetroDraft, setObservacoesDraft, isDirty, save };
+  return { getState, isActivated, activateGhost, backfillGhost, setValorDraft, setHorimetroDraft, setObservacoesDraft, isDirty, save };
 }

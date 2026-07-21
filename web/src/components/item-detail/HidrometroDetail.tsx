@@ -59,6 +59,14 @@ const ghostAddButtonStyle: CSSProperties = {
   lineHeight: 1,
 };
 
+const ghostBackfillButtonStyle: CSSProperties = {
+  ...ghostAddButtonStyle,
+  width: 'auto',
+  padding: '0 8px',
+  font: '600 11px var(--font-sans)',
+  color: 'var(--color-text-muted)',
+};
+
 const observacoesInputStyle: CSSProperties = {
   width: 160,
   padding: '4px 8px',
@@ -129,9 +137,19 @@ export function HidrometroDetail({
         const row = toGridRow(r);
         if (isGhost(r) && !editBuffer.isActivated(row)) {
           return (
-            <button type="button" onClick={() => editBuffer.activateGhost(r.date)} title="Adicionar leitura" style={ghostAddButtonStyle}>
-              +
-            </button>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button type="button" onClick={() => editBuffer.activateGhost(r.date)} title="Adicionar leitura" style={ghostAddButtonStyle}>
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => editBuffer.backfillGhost(r.date, readings)}
+                title="Retroativo: preencher com valor estimado e observação automática (domingo/feriado)"
+                style={ghostBackfillButtonStyle}
+              >
+                Retroativo
+              </button>
+            </div>
           );
         }
         const state = editBuffer.getState(row);
