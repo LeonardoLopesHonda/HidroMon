@@ -67,15 +67,6 @@ bun start
 # Pressione 'w' para web, 'a' para Android, 'i' para iOS
 ```
 
-### Deploy do backend
-
-`backend/Dockerfile` empacota a API com o LibreOffice headless necessário para a exportação em PDF do relatório IMASUL (`soffice --convert-to pdf`). O template do relatório vive em `docs/templates/`, fora de `backend/`, então o build precisa rodar a partir da raiz do monorepo:
-
-```bash
-docker build -f backend/Dockerfile -t telos-backend .
-docker run --rm -p 8000:8000 --env-file backend/.env telos-backend
-```
-
 ---
 
 ## 🇺🇸 English
@@ -129,13 +120,4 @@ cd mobile
 bun install
 bun start
 # Press 'w' for web, 'a' for Android, 'i' for iOS
-```
-
-### Backend deploy
-
-`backend/Dockerfile` bundles the API with the headless LibreOffice needed for PDF export of the IMASUL report (`soffice --convert-to pdf`). The report template lives in `docs/templates/`, outside `backend/`, so the build must run from the monorepo root:
-
-```bash
-docker build -f backend/Dockerfile -t telos-backend .
-docker run --rm -p 8000:8000 --env-file backend/.env telos-backend
 ```
