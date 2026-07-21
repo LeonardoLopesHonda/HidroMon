@@ -22,7 +22,7 @@ def get_items(
 
 def archive_item(db: Session, item_id: uuid.UUID, user_id: uuid.UUID, reason: str) -> MonitoredItem:
     item = _fetch_item(db, item_id)
-    _validate_archive_reason(item, reason)
+    _validate_archive_reason(reason)
 
     item.disabled = True
     item.archived_at = datetime.now(timezone.utc)
@@ -54,18 +54,8 @@ def _fetch_item(db: Session, item_id: uuid.UUID) -> MonitoredItem:
     return item
 
 
-def _validate_archive_reason(item: MonitoredItem, reason: str) -> None:
-    """Domain call, not a technical one: this system exists to satisfy DURH/outorga
-    filings, so whether an item under an active water-right obligation deserves a
-    stricter reason requirement than an unregulated one (e.g. pluviômetro) is a
-    business rule you should decide, not one I should guess at.
-
-    TODO(you): decide and implement the rule here. Some options to weigh:
-      - Require a non-empty, minimum-length reason for every item.
-      - Require a longer/more specific reason only when `item.durh_number` or
-        `item.outorga_number` is set (i.e. it's under an active water-right).
-      - Restrict to a fixed vocabulary (decommissioned / relocated / duplicate /
-        broken / other) rather than free text.
-    Raise `HTTPException(status_code=422, detail=...)` to reject; return None to allow.
-    """
-    raise NotImplementedError("Fill in the archive-reason business rule — see docstring above.")
+def _validate_archive_reason(reason: str) -> None:
+    """Every item type requires the same non-empty reason — no stricter rule for
+    outorga-bound items than for a pluviômetro/córrego (see PR #34 review)."""
+    if not reason or not reason.strip():
+        raise HTTPException(status_code=422, detail="Motivo do arquivamento é obrigatório.")

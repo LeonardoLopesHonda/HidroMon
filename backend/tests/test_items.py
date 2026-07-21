@@ -71,6 +71,13 @@ def test_archive_item_sets_fields_and_disables(db_session, item):
     assert archived.archived_at is not None
 
 
+@pytest.mark.parametrize("reason", ["", "   "])
+def test_archive_item_rejects_blank_reason(db_session, item, reason):
+    with pytest.raises(HTTPException) as exc_info:
+        item_service.archive_item(db_session, item.id, uuid.uuid4(), reason)
+    assert exc_info.value.status_code == 422
+
+
 def test_archive_item_missing_raises_404(db_session):
     with pytest.raises(HTTPException) as exc_info:
         item_service.archive_item(db_session, uuid.uuid4(), uuid.uuid4(), "motivo qualquer")
