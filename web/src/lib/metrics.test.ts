@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Reading } from '@/types';
 import {
+  allDailyDates,
+  backfillObservacao,
   cumulativeConsumptionSeries,
   daysElapsedInMonth,
   dailyRate,
+  estimateBackfillValor,
   exceedanceChecks,
   expectedDailyDates,
   fieldBoundsForNewDate,
@@ -364,10 +367,86 @@ describe('expectedDailyDates', () => {
   });
 });
 
+describe('allDailyDates', () => {
+  it('includes Sundays, unlike expectedDailyDates', () => {
+    const dates = allDailyDates(2026, 6, '2026-07-21');
+    expect(dates).toHaveLength(30);
+    expect(dates).toContain('2026-06-07');
+    expect(dates).toContain('2026-06-14');
+  });
+
+  it('caps at today for the current month', () => {
+    const dates = allDailyDates(2026, 7, '2026-07-21');
+    expect(dates[dates.length - 1]).toBe('2026-07-21');
+  });
+});
+
 describe('missingDailyDates', () => {
   it('excludes dates that already have a reading', () => {
     const readings = [reading('2026-07-01', 1000), reading('2026-07-02', 1010)];
     expect(missingDailyDates(readings, 2026, 7, '2026-07-03')).toEqual(['2026-07-03']);
+  });
+
+  it('includes a missing Sunday as a ghost day', () => {
+    const readings = [reading('2026-06-30', 1000)];
+    expect(missingDailyDates(readings, 2026, 7, '2026-07-05')).toEqual([
+      '2026-07-01',
+      '2026-07-02',
+      '2026-07-03',
+      '2026-07-04',
+      '2026-07-05',
+    ]); // 2026-07-05 is a Sunday and still shows up
+  });
+});
+
+describe('estimateBackfillValor', () => {
+  it('interpolates by elapsed days between the surrounding readings', () => {
+    const readings = [reading('2026-07-03', 1000), reading('2026-07-08', 1050)];
+    // 2 of the 5 days elapsed since the earlier reading -> 2/5 of the 50 m³ delta
+    expect(estimateBackfillValor(readings, '2026-07-05')).toEqual({ valor: 1020, method: 'interpolated' });
+  });
+
+  it('carries the earlier reading forward when there is no later neighbor', () => {
+    const readings = [reading('2026-07-03', 1000)];
+    expect(estimateBackfillValor(readings, '2026-07-05')).toEqual({ valor: 1000, method: 'carried' });
+  });
+
+  it('carries the later reading back when there is no earlier neighbor', () => {
+    const readings = [reading('2026-07-08', 1050)];
+    expect(estimateBackfillValor(readings, '2026-07-05')).toEqual({ valor: 1050, method: 'carried' });
+  });
+
+  it('returns null when there is no reading at all', () => {
+    expect(estimateBackfillValor([], '2026-07-05')).toBeNull();
+  });
+
+  it('breaks a same-day tie by recordedAt, not array order', () => {
+    // Two valor readings both dated 2026-07-03 (a same-day correction) — the later
+    // recordedAt must win as the "before" neighbor, regardless of array position.
+    const readings = [
+      reading('2026-07-03', 900, undefined, '2026-07-03T08:00:00Z'),
+      reading('2026-07-03', 1000, undefined, '2026-07-03T18:00:00Z'),
+      reading('2026-07-08', 1050),
+    ];
+    expect(estimateBackfillValor(readings, '2026-07-05')).toEqual({ valor: 1020, method: 'interpolated' });
+  });
+});
+
+describe('backfillObservacao', () => {
+  it('describes interpolation without asserting a day-of-week reason', () => {
+    expect(backfillObservacao({ valor: 1020, method: 'interpolated' })).toBe(
+      'Leitura não realizada fisicamente — valor estimado por interpolação entre leituras vizinhas.'
+    );
+  });
+
+  it('describes a carried-forward value distinctly from an interpolated one', () => {
+    expect(backfillObservacao({ valor: 1000, method: 'carried' })).toBe(
+      'Leitura não realizada fisicamente — valor estimado a partir da leitura vizinha mais próxima.'
+    );
+  });
+
+  it('describes the no-neighbors case when there is nothing to estimate from', () => {
+    expect(backfillObservacao(null)).toBe('Leitura não realizada fisicamente — sem leituras vizinhas para estimar o valor.');
   });
 });
 

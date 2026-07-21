@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { createReading, updateReading } from '@/lib/api/resources';
 import { ApiError } from '@/lib/api/client';
-import { fieldBoundsForNewDate, horimetroBounds, valorBoundsForReading } from '@/lib/metrics';
+import { backfillObservacao, estimateBackfillValor, fieldBoundsForNewDate, horimetroBounds, valorBoundsForReading } from '@/lib/metrics';
 import type { CellStatus } from '@/components/item-detail/NumericCell';
 import type { Reading } from '@/types';
 
@@ -77,6 +77,27 @@ export function useReadingEditBuffer(itemId: string, onReadingSaved: (updated: R
   const activateGhost = (date: string) => {
     const key = `ghost:${date}`;
     setBuffer((b) => (key in b ? b : { ...b, [key]: { valorDraft: '', horimetroDraft: '', observacoesDraft: '', status: 'clean' } }));
+  };
+
+  // "Retroativo": prefills a ghost row (typically a Sunday or holiday with no visit) with
+  // an estimated valor and an observação describing how it was estimated, rather than
+  // leaving the day absent from the record. Still lands in the buffer as 'dirty' — it's
+  // a draft like any other, saved via the normal flow. Nothing here checks day-of-week
+  // or a holiday calendar (by design — see issue #32): it's a manual action the
+  // supervisor chooses to take, so the observação only ever describes the estimation
+  // method actually used, never a specific reason the code can't verify.
+  const backfillGhost = (date: string, readings: Reading[]) => {
+    const key = `ghost:${date}`;
+    const estimate = estimateBackfillValor(readings, date);
+    setBuffer((b) => ({
+      ...b,
+      [key]: {
+        valorDraft: estimate != null ? String(estimate.valor) : '',
+        horimetroDraft: b[key]?.horimetroDraft ?? '',
+        observacoesDraft: backfillObservacao(estimate),
+        status: 'dirty',
+      },
+    }));
   };
 
   const setValorDraft = (row: GridRow, value: string) => {
@@ -198,5 +219,5 @@ export function useReadingEditBuffer(itemId: string, onReadingSaved: (updated: R
     }
   }
 
-  return { getState, isActivated, activateGhost, setValorDraft, setHorimetroDraft, setObservacoesDraft, isDirty, save };
+  return { getState, isActivated, activateGhost, backfillGhost, setValorDraft, setHorimetroDraft, setObservacoesDraft, isDirty, save };
 }

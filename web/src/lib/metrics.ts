@@ -272,13 +272,11 @@ function monthIndex(year: number, month: number): number {
 }
 
 /**
- * Calendar days a daily-cadence Área expects a reading on, within the given
- * month — every day except Sunday (CONTEXT.md → diasSemLeitura), using
- * actual calendar days, not the outorga's fixed 30-day convention (which is
- * a separate, deliberately different, convention — see CONTEXT.md). Capped
- * at today for the current month; empty for a month that hasn't started.
+ * Calendar days of the given month, capped at today for the current month
+ * and empty for a month that hasn't started yet. Shared day-range logic
+ * behind `expectedDailyDates` and `allDailyDates` below.
  */
-export function expectedDailyDates(year: number, month: number, todayISO: string): string[] {
+function calendarDaysUpToToday(year: number, month: number, todayISO: string): number[] {
   const [todayYear, todayMonth, todayDay] = todayISO.split('-').map(Number);
   if (monthIndex(year, month) > monthIndex(todayYear, todayMonth)) return [];
 
@@ -286,18 +284,105 @@ export function expectedDailyDates(year: number, month: number, todayISO: string
   const lastDay =
     monthIndex(year, month) === monthIndex(todayYear, todayMonth) ? Math.min(todayDay, totalDays) : totalDays;
 
-  const dates: string[] = [];
-  for (let day = 1; day <= lastDay; day++) {
-    const isSunday = new Date(Date.UTC(year, month - 1, day)).getUTCDay() === 0;
-    if (!isSunday) dates.push(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
-  }
-  return dates;
+  return Array.from({ length: lastDay }, (_, i) => i + 1);
 }
 
-/** Expected daily-cadence dates with no reading at all — the "ghost day" gaps to backfill. */
+function isoDate(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
+ * Calendar days a daily-cadence Área expects a reading on, within the given
+ * month — every day except Sunday (CONTEXT.md → diasSemLeitura), using
+ * actual calendar days, not the outorga's fixed 30-day convention (which is
+ * a separate, deliberately different, convention — see CONTEXT.md). Capped
+ * at today for the current month; empty for a month that hasn't started.
+ */
+export function expectedDailyDates(year: number, month: number, todayISO: string): string[] {
+  return calendarDaysUpToToday(year, month, todayISO)
+    .filter((day) => new Date(Date.UTC(year, month - 1, day)).getUTCDay() !== 0)
+    .map((day) => isoDate(year, month, day));
+}
+
+/**
+ * Every calendar day of the month, Sundays included — the day range shown as
+ * ghost rows in the editable reading grid. Deliberately broader than
+ * `expectedDailyDates`: Sundays are never physically read, but the grid still
+ * offers them as a row so a supervisor can retroactively backfill one (see
+ * `estimateBackfillValor`) instead of leaving a silent gap in the record.
+ */
+export function allDailyDates(year: number, month: number, todayISO: string): string[] {
+  return calendarDaysUpToToday(year, month, todayISO).map((day) => isoDate(year, month, day));
+}
+
+/** All daily-cadence dates with no reading at all — the "ghost day" gaps to backfill. */
 export function missingDailyDates(readings: Reading[], year: number, month: number, todayISO: string): string[] {
   const present = new Set(readings.map((r) => r.date));
-  return expectedDailyDates(year, month, todayISO).filter((d) => !present.has(d));
+  return allDailyDates(year, month, todayISO).filter((d) => !present.has(d));
+}
+
+export type BackfillMethod = 'interpolated' | 'carried';
+
+export interface BackfillEstimate {
+  valor: number;
+  method: BackfillMethod;
+}
+
+/**
+ * Nearest readings with a `valor` before/after a ghost date, tie-broken by
+ * (date, recordedAt) same as `fieldNeighborBounds` — a same-day correction
+ * must resolve by time-of-day, not array order (see `e8d319f`, which fixed
+ * this exact class of bug for batch-save ordering).
+ */
+function valorNeighbors(readings: Reading[], date: string): { before: Reading | null; after: Reading | null } {
+  const target = { date, recordedAt: `${date}T12:00:00.000Z` };
+  const withValor = sortByDateAndRecordedAt(readings.filter((r) => r.values.valor != null));
+  const isBefore = (r: Reading) => r.date < target.date || (r.date === target.date && r.recordedAt < target.recordedAt);
+  const isAfter = (r: Reading) => r.date > target.date || (r.date === target.date && r.recordedAt > target.recordedAt);
+  return { before: [...withValor].reverse().find(isBefore) ?? null, after: withValor.find(isAfter) ?? null };
+}
+
+/**
+ * Estimate for a ghost day's `valor`, from the nearest chronological readings
+ * before and after it. Uses the same day-weighted spreading as `dailyRate`
+ * (CONTEXT.md → Taxa diária: a gap's delta is spread evenly across the days
+ * it covers, never dumped as a spike) rather than a plain midpoint — so a
+ * ghost day sitting closer to one neighbor gets an estimate closer to that
+ * neighbor's value. Falls back to carrying the single known neighbor forward
+ * (or back) when only one side exists — the `method` is reported alongside
+ * the value so callers never describe a carried-forward value as
+ * "interpolated". Returns `null` when neither neighbor exists (a ghost date
+ * outside all recorded history).
+ */
+export function estimateBackfillValor(readings: Reading[], date: string): BackfillEstimate | null {
+  const { before, after } = valorNeighbors(readings, date);
+
+  if (before && after) {
+    const span = daysBetween(before.date, after.date);
+    const elapsed = daysBetween(before.date, date);
+    const rate = (after.values.valor! - before.values.valor!) / span;
+    return { valor: Math.round((before.values.valor! + rate * elapsed) * 100) / 100, method: 'interpolated' };
+  }
+  if (before) return { valor: before.values.valor!, method: 'carried' };
+  if (after) return { valor: after.values.valor!, method: 'carried' };
+  return null;
+}
+
+/**
+ * Observação recorded on a "Retroativo" backfilled ghost day, so the record
+ * is explicit that the value wasn't read off the physical meter — and honest
+ * about how it was estimated (never claims interpolation for a carried-over
+ * value, and never claims a specific day-of-week reason the button doesn't
+ * actually check — see PR #33 review).
+ */
+export function backfillObservacao(estimate: BackfillEstimate | null): string {
+  if (estimate?.method === 'interpolated') {
+    return 'Leitura não realizada fisicamente — valor estimado por interpolação entre leituras vizinhas.';
+  }
+  if (estimate?.method === 'carried') {
+    return 'Leitura não realizada fisicamente — valor estimado a partir da leitura vizinha mais próxima.';
+  }
+  return 'Leitura não realizada fisicamente — sem leituras vizinhas para estimar o valor.';
 }
 
 /** `lastHorímetro − firstHorímetro` within the month. Null when no horímetro data exists that month. */
