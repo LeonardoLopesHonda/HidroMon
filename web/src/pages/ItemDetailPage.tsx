@@ -8,6 +8,7 @@ import { DurhOutorgaInfo } from '@/components/item-detail/DurhOutorgaInfo';
 import { HidrometroDetail } from '@/components/item-detail/HidrometroDetail';
 import { PluviometroDetail } from '@/components/item-detail/PluviometroDetail';
 import { CorregoDetail } from '@/components/item-detail/CorregoDetail';
+import { ReadingsExportDialog } from '@/components/item-detail/ReadingsExportDialog';
 import { MonthSelector, currentMonth, type SelectedMonth } from '@/components/shared/MonthSelector';
 import type { Area, MonitoredItem, MonitoringType, Reading } from '@/types';
 
@@ -25,6 +26,7 @@ export function ItemDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<SelectedMonth>(currentMonth());
+  const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,8 +95,27 @@ export function ItemDetailPage() {
               {area && <span style={{ font: '400 12.5px var(--font-sans)', color: 'var(--color-text-faint)' }}>{area.name}</span>}
               <DurhOutorgaInfo item={item} />
             </div>
-            <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setExportOpen(true)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 8,
+                  border: '1px solid var(--color-border-input)',
+                  background: 'var(--color-surface)',
+                  color: 'var(--color-text)',
+                  font: '600 12px var(--font-sans)',
+                  cursor: 'pointer',
+                }}
+              >
+                Baixar .xlsx
+              </button>
+              <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
+            </div>
           </div>
+
+          {exportOpen && <ReadingsExportDialog item={item} selectedMonth={selectedMonth} onClose={() => setExportOpen(false)} />}
 
           {item.type === 'hidrometro' && (
             <HidrometroDetail
