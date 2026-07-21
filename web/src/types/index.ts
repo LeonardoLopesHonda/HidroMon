@@ -24,6 +24,9 @@ export interface MonitoredItem {
   barramentoDurh: string | null;
   lastTecnicoResponsavel: string | null;
   lastCrea: string | null;
+  archivedAt: string | null;
+  archivedReason: string | null;
+  archivedBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
