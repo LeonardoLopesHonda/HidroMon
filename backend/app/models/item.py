@@ -27,5 +27,12 @@ class ItemResponse(BaseModel):
     barramento_durh: str | None
     last_tecnico_responsavel: str | None
     last_crea: str | None
+    archived_at: datetime | None
+    archived_reason: str | None
+    archived_by: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
+
+
+class ItemArchiveRequest(BaseModel):
+    reason: str

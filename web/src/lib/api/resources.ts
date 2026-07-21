@@ -18,3 +18,8 @@ export interface ReadingCreateInput {
 }
 
 export const createReading = (body: ReadingCreateInput) => apiClient.post<Reading>('/readings', body);
+
+export const archiveItem = (id: string, reason: string) =>
+  apiClient.post<MonitoredItem>(`/items/${id}/archive`, { reason });
+
+export const unarchiveItem = (id: string) => apiClient.post<MonitoredItem>(`/items/${id}/unarchive`, {});

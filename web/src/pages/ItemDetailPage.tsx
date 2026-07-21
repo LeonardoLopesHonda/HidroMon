@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getAreas, getItems, getReadings } from '@/lib/api/resources';
+import { getAreas, getItems, getReadings, unarchiveItem } from '@/lib/api/resources';
 import { ApiError } from '@/lib/api/client';
 import { PageShell } from '@/components/PageShell';
 import { Badge } from '@/components/ui/Badge';
@@ -9,6 +9,7 @@ import { HidrometroDetail } from '@/components/item-detail/HidrometroDetail';
 import { PluviometroDetail } from '@/components/item-detail/PluviometroDetail';
 import { CorregoDetail } from '@/components/item-detail/CorregoDetail';
 import { ReadingsExportDialog } from '@/components/item-detail/ReadingsExportDialog';
+import { ArchiveItemDialog } from '@/components/item-detail/ArchiveItemDialog';
 import { MonthSelector, currentMonth, type SelectedMonth } from '@/components/shared/MonthSelector';
 import type { Area, MonitoredItem, MonitoringType, Reading } from '@/types';
 
@@ -27,6 +28,8 @@ export function ItemDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<SelectedMonth>(currentMonth());
   const [exportOpen, setExportOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +70,21 @@ export function ItemDetailPage() {
   const handleReadingUpdated = useCallback((updated: Reading) => {
     setReadings((rs) => (rs.some((r) => r.id === updated.id) ? rs.map((r) => (r.id === updated.id ? updated : r)) : [...rs, updated]));
   }, []);
+
+  const handleItemUpdated = useCallback((updated: MonitoredItem) => {
+    setItems((its) => its.map((i) => (i.id === updated.id ? updated : i)));
+  }, []);
+
+  const handleUnarchive = async () => {
+    if (!item) return;
+    setArchiveError(null);
+    try {
+      const updated = await unarchiveItem(item.id);
+      handleItemUpdated(updated);
+    } catch (err) {
+      setArchiveError(err instanceof ApiError ? 'Não foi possível reativar o item.' : 'Erro de conexão com o servidor.');
+    }
+  };
 
   return (
     <PageShell>
@@ -111,11 +129,47 @@ export function ItemDetailPage() {
               >
                 Baixar .xlsx
               </button>
+              {item.disabled ? (
+                <button
+                  type="button"
+                  onClick={handleUnarchive}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 8,
+                    border: '1px solid var(--color-border-input)',
+                    background: 'var(--color-surface)',
+                    color: 'var(--color-text)',
+                    font: '600 12px var(--font-sans)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Reativar item
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setArchiveOpen(true)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 8,
+                    border: '1px solid var(--color-border-input)',
+                    background: 'var(--color-surface)',
+                    color: 'var(--color-danger-text)',
+                    font: '600 12px var(--font-sans)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Arquivar item
+                </button>
+              )}
               <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
             </div>
           </div>
 
+          {archiveError && <p style={{ font: '400 13px var(--font-sans)', color: 'var(--color-danger-text)' }}>{archiveError}</p>}
+
           {exportOpen && <ReadingsExportDialog item={item} selectedMonth={selectedMonth} onClose={() => setExportOpen(false)} />}
+          {archiveOpen && <ArchiveItemDialog item={item} onArchived={handleItemUpdated} onClose={() => setArchiveOpen(false)} />}
 
           {item.type === 'hidrometro' && (
             <HidrometroDetail

@@ -51,6 +51,9 @@ class MonitoredItem(Base):
     barramento_durh: Mapped[str | None] = mapped_column(String)
     last_tecnico_responsavel: Mapped[str | None] = mapped_column(String)
     last_crea: Mapped[str | None] = mapped_column(String)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archived_reason: Mapped[str | None] = mapped_column(String)
+    archived_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
