@@ -27,6 +27,11 @@
   --color-disabled-bg: #eef1ee;
   --color-disabled-text: #8a978f;
 
+  --color-series-1: #2a78d6;
+  --color-series-2: #eb6834;
+  --color-series-3: #1baf7a;
+  --color-series-4: #eda100;
+
   --font-sans: 'IBM Plex Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
 

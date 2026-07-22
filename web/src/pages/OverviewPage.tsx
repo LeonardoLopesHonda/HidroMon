@@ -5,7 +5,9 @@ import { PageShell } from '@/components/PageShell';
 import { MonthSelector, currentMonth, type SelectedMonth } from '@/components/shared/MonthSelector';
 import { ComplianceCard } from '@/components/overview/ComplianceCard';
 import { CompactCard } from '@/components/overview/CompactCard';
-import { hidrometroMonthStats, isInMonth, nextMonthStartISO } from '@/lib/metrics';
+import { AreaPluviometroMaxChart, type AreaPluviometroSeries } from '@/components/overview/charts/AreaPluviometroMaxChart';
+import { AreaCorregoVazaoChart, type AreaCorregoSeries } from '@/components/overview/charts/AreaCorregoVazaoChart';
+import { hidrometroMonthStats, isInMonth, monthlyPrecipitationMax, monthlyVazaoAverages, nextMonthStartISO } from '@/lib/metrics';
 import type { Area, MonitoredItem, Reading } from '@/types';
 
 export function OverviewPage() {
@@ -98,6 +100,52 @@ export function OverviewPage() {
                 >
                   {area.name}
                 </h2>
+
+                {(() => {
+                  const pluviometros = areaItems.filter((i) => i.type === 'pluviometro');
+                  const corregos = areaItems.filter((i) => i.type === 'corrego');
+                  const pluviometroSeries: AreaPluviometroSeries[] = pluviometros.map((i) => ({
+                    id: i.id,
+                    name: i.name,
+                    points: monthlyPrecipitationMax(readingsByItem.get(i.id) ?? [], selectedMonth.year),
+                  }));
+                  const corregoSeries: AreaCorregoSeries[] = corregos.map((i) => ({
+                    id: i.id,
+                    name: i.name,
+                    points: monthlyVazaoAverages(readingsByItem.get(i.id) ?? [], selectedMonth.year),
+                  }));
+
+                  if (pluviometroSeries.length === 0 && corregoSeries.length === 0) return null;
+
+                  return (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+                        gap: 14,
+                        marginBottom: 16,
+                      }}
+                    >
+                      {pluviometroSeries.length > 0 && (
+                        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: '14px 18px' }}>
+                          <h3 style={{ margin: '0 0 10px', font: '600 12.5px var(--font-sans)', color: 'var(--color-text)' }}>
+                            Máximas de chuva ({selectedMonth.year})
+                          </h3>
+                          <AreaPluviometroMaxChart series={pluviometroSeries} />
+                        </div>
+                      )}
+                      {corregoSeries.length > 0 && (
+                        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: '14px 18px' }}>
+                          <h3 style={{ margin: '0 0 10px', font: '600 12.5px var(--font-sans)', color: 'var(--color-text)' }}>
+                            Vazão média mensal ({selectedMonth.year})
+                          </h3>
+                          <AreaCorregoVazaoChart series={corregoSeries} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <div
                   style={{
                     display: 'grid',
