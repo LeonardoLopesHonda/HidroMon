@@ -535,20 +535,40 @@ export function dailyPrecipitationPoints(readings: Reading[], year: number, mont
   }));
 }
 
-export interface MonthlyPrecipitationPoint {
+export interface MonthlyMaxPoint {
   month: number; // 1..12
-  totalMm: number;
-  hasData: boolean; // false = no readings that month, distinct from a real 0mm month
+  maxMm: number;
+  hasData: boolean; // false = no readings that month, distinct from a real 0mm day
 }
 
-/** Sum (not delta) of daily mm per calendar month — precipitation isn't a cumulative odometer. */
-export function monthlyPrecipitationTotals(readings: Reading[], year: number): MonthlyPrecipitationPoint[] {
-  const points: MonthlyPrecipitationPoint[] = [];
+/** Highest single daily reading (not a sum) per calendar month — CONTEXT.md's "Máximo" stat for pluviômetro. */
+export function monthlyPrecipitationMax(readings: Reading[], year: number): MonthlyMaxPoint[] {
+  const points: MonthlyMaxPoint[] = [];
   for (let month = 1; month <= 12; month++) {
     const inMonth = readings.filter((r) => isInMonth(r.date, year, month) && r.values.valor != null);
     points.push({
       month,
-      totalMm: inMonth.reduce((sum, r) => sum + r.values.valor!, 0),
+      maxMm: inMonth.length > 0 ? Math.max(...inMonth.map((r) => r.values.valor!)) : 0,
+      hasData: inMonth.length > 0,
+    });
+  }
+  return points;
+}
+
+export interface MonthlyVazaoPoint {
+  month: number; // 1..12
+  avgVazao: number; // m³/s
+  hasData: boolean; // false = no readings that month, distinct from a real 0 m³/s average
+}
+
+/** Average measured vazão per calendar month — CONTEXT.md's "Média" stat for córrego. */
+export function monthlyVazaoAverages(readings: Reading[], year: number): MonthlyVazaoPoint[] {
+  const points: MonthlyVazaoPoint[] = [];
+  for (let month = 1; month <= 12; month++) {
+    const inMonth = readings.filter((r) => isInMonth(r.date, year, month) && r.values.vazao != null);
+    points.push({
+      month,
+      avgVazao: inMonth.length > 0 ? inMonth.reduce((sum, r) => sum + r.values.vazao!, 0) / inMonth.length : 0,
       hasData: inMonth.length > 0,
     });
   }

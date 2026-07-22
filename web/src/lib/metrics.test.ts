@@ -18,7 +18,8 @@ import {
   monthEndProjection,
   monthlyCap,
   monthlyConsumption,
-  monthlyPrecipitationTotals,
+  monthlyPrecipitationMax,
+  monthlyVazaoAverages,
   nextMonthStartISO,
   valorBoundsForReading,
   vazaoEfetivaHorimetro,
@@ -261,19 +262,37 @@ describe('cumulativeConsumptionSeries', () => {
   });
 });
 
-describe('monthlyPrecipitationTotals', () => {
-  it('sums (never deltas) daily mm per month', () => {
+describe('monthlyPrecipitationMax', () => {
+  it('takes the highest single daily reading (never a sum) per month', () => {
     const readings = [reading('2026-07-01', 5), reading('2026-07-02', 8), reading('2026-08-01', 3)];
-    const points = monthlyPrecipitationTotals(readings, 2026);
-    expect(points[6]).toMatchObject({ month: 7, totalMm: 13, hasData: true }); // July
-    expect(points[7]).toMatchObject({ month: 8, totalMm: 3, hasData: true }); // August
+    const points = monthlyPrecipitationMax(readings, 2026);
+    expect(points[6]).toMatchObject({ month: 7, maxMm: 8, hasData: true }); // July
+    expect(points[7]).toMatchObject({ month: 8, maxMm: 3, hasData: true }); // August
   });
 
-  it('distinguishes a month with no readings from a measured 0mm month', () => {
+  it('distinguishes a month with no readings from a measured 0mm day', () => {
     const readings = [reading('2026-07-01', 0)];
-    const points = monthlyPrecipitationTotals(readings, 2026);
-    expect(points[6]).toMatchObject({ month: 7, totalMm: 0, hasData: true });
-    expect(points[8]).toMatchObject({ month: 9, totalMm: 0, hasData: false });
+    const points = monthlyPrecipitationMax(readings, 2026);
+    expect(points[6]).toMatchObject({ month: 7, maxMm: 0, hasData: true });
+    expect(points[8]).toMatchObject({ month: 9, maxMm: 0, hasData: false });
+  });
+});
+
+describe('monthlyVazaoAverages', () => {
+  it('averages measured vazão per month', () => {
+    const readings = [reading('2026-07-01', 5), reading('2026-07-02', 8)].map((r, i) => ({
+      ...r,
+      values: { vazao: i === 0 ? 2 : 4 },
+    }));
+    const points = monthlyVazaoAverages(readings, 2026);
+    expect(points[6]).toMatchObject({ month: 7, avgVazao: 3, hasData: true }); // July
+  });
+
+  it('distinguishes a month with no readings from a measured 0 m³/s average', () => {
+    const readings = [{ ...reading('2026-07-01', 0), values: { vazao: 0 } }];
+    const points = monthlyVazaoAverages(readings, 2026);
+    expect(points[6]).toMatchObject({ month: 7, avgVazao: 0, hasData: true });
+    expect(points[8]).toMatchObject({ month: 9, avgVazao: 0, hasData: false });
   });
 });
 
