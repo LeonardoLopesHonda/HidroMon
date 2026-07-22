@@ -321,6 +321,45 @@ export function missingDailyDates(readings: Reading[], year: number, month: numb
   return allDailyDates(year, month, todayISO).filter((d) => !present.has(d));
 }
 
+/** Monday of the calendar week (Mon–Sun) containing `isoDate`. */
+function mondayOf(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const dayUTC = Date.UTC(y, m - 1, d);
+  const dow = new Date(dayUTC).getUTCDay(); // 0=Sun..6=Sat
+  const diffToMonday = dow === 0 ? -6 : 1 - dow;
+  return new Date(dayUTC + diffToMonday * 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Week-start (Monday) dates a weekly-cadence Área expects a reading on, within
+ * the given month — one bucket per calendar week (Mon–Sun), owned by whichever
+ * month its Monday falls in (so a week straddling a month boundary is never
+ * double-counted across both months' views). Capped at today for the current
+ * month, same as `allDailyDates` — a week that hasn't started yet gets no
+ * ghost row.
+ */
+export function expectedWeeklyDates(year: number, month: number, todayISO: string): string[] {
+  const monthStart = monthStartISO(year, month);
+  const monthEnd = isoDate(year, month, daysInCalendarMonth(year, month));
+  const mondays = new Set<string>();
+  for (const day of calendarDaysUpToToday(year, month, todayISO)) {
+    const monday = mondayOf(isoDate(year, month, day));
+    if (monday >= monthStart && monday <= monthEnd) mondays.add(monday);
+  }
+  return Array.from(mondays).sort();
+}
+
+/** All expected weeks (see `expectedWeeklyDates`) with no reading anywhere in their Mon–Sun span. */
+export function missingWeeklyDates(readings: Reading[], year: number, month: number, todayISO: string): string[] {
+  return expectedWeeklyDates(year, month, todayISO).filter((monday) => {
+    const start = toUTCDays(monday);
+    return !readings.some((r) => {
+      const days = toUTCDays(r.date);
+      return days >= start && days < start + 7;
+    });
+  });
+}
+
 export type BackfillMethod = 'interpolated' | 'carried';
 
 export interface BackfillEstimate {
