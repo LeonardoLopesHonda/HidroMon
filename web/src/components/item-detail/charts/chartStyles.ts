@@ -15,3 +15,8 @@ export const emptyChartStyle = {
   font: '400 12.5px var(--font-sans)',
   color: 'var(--color-text-faint)',
 };
+
+export const MONTH_ABBR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+/** Fixed hue order (dataviz skill categorical theme) — assigned by series position, never cycled or re-sorted. */
+export const SERIES_COLORS = ['var(--color-series-1)', 'var(--color-series-2)', 'var(--color-series-3)', 'var(--color-series-4)'];

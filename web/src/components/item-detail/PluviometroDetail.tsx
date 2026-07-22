@@ -6,7 +6,7 @@ import { YearlyPrecipitationSummary } from '@/components/item-detail/charts/Year
 import { ComparativoMensalExplanation } from '@/components/item-detail/chartExplanations';
 import { sectionStyle, sectionTitleStyle } from '@/components/item-detail/sectionStyles';
 import type { SelectedMonth } from '@/components/shared/MonthSelector';
-import { dailyPrecipitationPoints, isInMonth, monthlyPrecipitationTotals } from '@/lib/metrics';
+import { dailyPrecipitationPoints, isInMonth, monthlyPrecipitationMax } from '@/lib/metrics';
 import { formatNumberBR } from '@/lib/format';
 import type { Reading } from '@/types';
 
@@ -14,8 +14,8 @@ export function PluviometroDetail({ readings, selectedMonth }: { readings: Readi
   const { year, month } = selectedMonth;
   const monthReadings = readings.filter((r) => isInMonth(r.date, year, month));
 
-  const yearlyTotals = monthlyPrecipitationTotals(readings, year);
-  const monthTotal = yearlyTotals.find((p) => p.month === month) ?? { totalMm: 0, hasData: false };
+  const yearlyMax = monthlyPrecipitationMax(readings, year);
+  const monthMax = yearlyMax.find((p) => p.month === month) ?? { maxMm: 0, hasData: false };
 
   const dailyPoints = dailyPrecipitationPoints(readings, year, month);
 
@@ -27,7 +27,7 @@ export function PluviometroDetail({ readings, selectedMonth }: { readings: Readi
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div style={sectionStyle}>
-        <StatTile label="Total do mês" value={monthTotal.hasData ? `${formatNumberBR(monthTotal.totalMm)} mm` : '—'} />
+        <StatTile label="Máximo do mês" value={monthMax.hasData ? `${formatNumberBR(monthMax.maxMm)} mm` : '—'} />
       </div>
 
       <div style={sectionStyle}>
@@ -37,12 +37,12 @@ export function PluviometroDetail({ readings, selectedMonth }: { readings: Readi
 
       <div style={sectionStyle}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <h3 style={{ ...sectionTitleStyle, margin: 0 }}>Comparativo mensal ({year})</h3>
-          <InfoPopover label="Como o comparativo mensal é calculado">
+          <h3 style={{ ...sectionTitleStyle, margin: 0 }}>Máximas mensais ({year})</h3>
+          <InfoPopover label="Como as máximas mensais são calculadas">
             <ComparativoMensalExplanation />
           </InfoPopover>
         </span>
-        <YearlyPrecipitationSummary points={yearlyTotals} selectedMonth={month} />
+        <YearlyPrecipitationSummary points={yearlyMax} selectedMonth={month} />
       </div>
 
       <ReadingHistoryTable columns={columns} rows={monthReadings} />

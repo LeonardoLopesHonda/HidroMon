@@ -51,8 +51,8 @@ export function ConsumoAcumuladoExplanation() {
 export function ComparativoMensalExplanation() {
   return (
     <p style={lastP}>
-      Total de chuva (mm) somado por mês a partir das leituras diárias de precipitação. Um mês sem nenhuma leitura aparece como um vão no
-      gráfico, não como zero.
+      Maior leitura diária de precipitação (mm) registrada em cada mês — não a soma do mês. Um mês sem nenhuma leitura aparece como um vão
+      no gráfico, não como zero.
     </p>
   );
 }
