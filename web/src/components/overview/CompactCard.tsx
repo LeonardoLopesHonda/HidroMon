@@ -1,13 +1,16 @@
+import { Link } from 'react-router-dom';
 import { formatDateBR, formatNumberBR } from '@/lib/format';
 
 interface PluviometroCompactCardProps {
   type: 'pluviometro';
+  itemId: string;
   itemName: string;
-  monthTotalMm: number;
+  monthMaxMm: number;
 }
 
 interface CorregoCompactCardProps {
   type: 'corrego';
+  itemId: string;
   itemName: string;
   latestDate: string | null;
   latestNivel: number | null;
@@ -21,18 +24,17 @@ const cardStyle = {
   border: '1px solid var(--color-border)',
   borderRadius: 10,
   padding: '16px 18px',
-  display: 'flex',
   flexDirection: 'column' as const,
   gap: 6,
 };
 
 export function CompactCard(props: CompactCardProps) {
   return (
-    <div style={cardStyle}>
+    <Link to={`/items/${props.itemId}`} className="overview-card-link" style={cardStyle}>
       <span style={{ font: '600 13.5px var(--font-sans)', color: 'var(--color-text)' }}>{props.itemName}</span>
       {props.type === 'pluviometro' ? (
         <span style={{ font: '400 12.5px var(--font-sans)', color: 'var(--color-text-muted)' }}>
-          {formatNumberBR(props.monthTotalMm)} mm no mês
+          {formatNumberBR(props.monthMaxMm)} mm (máx. no mês)
         </span>
       ) : props.latestDate ? (
         <>
@@ -49,6 +51,6 @@ export function CompactCard(props: CompactCardProps) {
       ) : (
         <span style={{ font: '400 12.5px var(--font-sans)', color: 'var(--color-text-faint)' }}>Sem leituras</span>
       )}
-    </div>
+    </Link>
   );
 }

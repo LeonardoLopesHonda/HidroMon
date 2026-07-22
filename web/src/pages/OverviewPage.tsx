@@ -114,6 +114,7 @@ export function OverviewPage() {
                       return (
                         <ComplianceCard
                           key={item.id}
+                          itemId={item.id}
                           itemName={item.name}
                           monthToDateConsumption={stats.monthToDateConsumption}
                           cap={stats.cap}
@@ -127,11 +128,11 @@ export function OverviewPage() {
                     }
 
                     if (item.type === 'pluviometro') {
-                      const monthTotalMm = itemReadings
+                      const monthMaxMm = itemReadings
                         .filter((r) => isInMonth(r.date, selectedMonth.year, selectedMonth.month))
-                        .reduce((sum, r) => sum + (r.values.valor ?? 0), 0);
+                        .reduce((max, r) => Math.max(max, r.values.valor ?? 0), 0);
                       return (
-                        <CompactCard key={item.id} type="pluviometro" itemName={item.name} monthTotalMm={monthTotalMm} />
+                        <CompactCard key={item.id} type="pluviometro" itemId={item.id} itemName={item.name} monthMaxMm={monthMaxMm} />
                       );
                     }
 
@@ -147,6 +148,7 @@ export function OverviewPage() {
                       <CompactCard
                         key={item.id}
                         type="corrego"
+                        itemId={item.id}
                         itemName={item.name}
                         latestDate={latest?.date ?? null}
                         latestNivel={latest?.values.nivel ?? null}

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Badge } from '@/components/ui/Badge';
 import { formatNumberBR, formatPercentBR } from '@/lib/format';
@@ -22,6 +23,7 @@ const STATE_TEXT_COLOR: Record<ExceedanceChecks['cardState'], string> = {
 };
 
 export interface ComplianceCardProps {
+  itemId: string;
   itemName: string;
   monthToDateConsumption: number;
   cap: number;
@@ -33,6 +35,7 @@ export interface ComplianceCardProps {
 }
 
 export function ComplianceCard({
+  itemId,
   itemName,
   monthToDateConsumption,
   cap,
@@ -47,13 +50,14 @@ export function ComplianceCard({
   const projectionRatio = cap > 0 ? projection / cap : 0;
 
   return (
-    <div
+    <Link
+      to={`/items/${itemId}`}
+      className="overview-card-link"
       style={{
         background: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
         borderRadius: 10,
         padding: '16px 18px',
-        display: 'flex',
         flexDirection: 'column',
         gap: 10,
       }}
@@ -95,6 +99,6 @@ export function ComplianceCard({
           )}
         </div>
       )}
-    </div>
+    </Link>
   );
 }
