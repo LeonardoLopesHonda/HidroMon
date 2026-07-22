@@ -50,7 +50,14 @@ async function request<T>(
   });
 
   const text = await res.text();
-  const parsed: unknown = text ? JSON.parse(text) : null;
+  let parsed: unknown = null;
+  if (text) {
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = text;
+    }
+  }
 
   if (!res.ok) {
     throw new ApiError(res.status, parsed, `${method} ${path} -> ${res.status}`);

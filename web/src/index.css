@@ -61,3 +61,14 @@ textarea:focus {
 button {
   cursor: pointer;
 }
+
+.overview-card-link {
+  display: flex;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.overview-card-link:hover {
+  border-color: var(--color-accent);
+}
