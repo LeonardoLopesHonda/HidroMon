@@ -4,7 +4,11 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.db.database import MonitoredItem
+from app.db.database import Area, MonitoredItem
+from app.models.item import ItemCreateRequest
+
+VALID_TYPES = {"hidrometro", "pluviometro", "corrego"}
+VALID_CORREGO_METHODS = {"regua", "tambor"}
 
 
 def get_items(
@@ -45,6 +49,51 @@ def unarchive_item(db: Session, item_id: uuid.UUID) -> MonitoredItem:
     db.commit()
     db.refresh(item)
     return item
+
+
+def create_item(db: Session, data: ItemCreateRequest) -> MonitoredItem:
+    if not db.query(Area).filter(Area.id == data.area_id).first():
+        raise HTTPException(status_code=404, detail=f"Area {data.area_id} not found")
+    if db.query(MonitoredItem).filter(MonitoredItem.id == data.id).first():
+        raise HTTPException(status_code=409, detail=f"MonitoredItem {data.id} already exists")
+    _validate_create(data)
+
+    now = datetime.now(timezone.utc)
+    item = MonitoredItem(
+        id=data.id,
+        area_id=data.area_id,
+        name=data.name.strip(),
+        type=data.type,
+        limite_outorgado=data.limite_outorgado,
+        unit=data.unit,
+        horas_operacao=data.horas_operacao,
+        corrego_method=data.corrego_method,
+        has_horimetro=data.has_horimetro,
+        disabled=False,
+        durh_number=data.durh_number,
+        outorga_number=data.outorga_number,
+        barramento_durh=data.barramento_durh,
+        last_tecnico_responsavel=None,
+        last_crea=None,
+        archived_at=None,
+        archived_reason=None,
+        archived_by=None,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def _validate_create(data: ItemCreateRequest) -> None:
+    if not data.name or not data.name.strip():
+        raise HTTPException(status_code=422, detail="Nome do item é obrigatório.")
+    if data.type not in VALID_TYPES:
+        raise HTTPException(status_code=422, detail=f"Tipo de item inválido: {data.type}")
+    if data.type == "corrego" and data.corrego_method not in VALID_CORREGO_METHODS:
+        raise HTTPException(status_code=422, detail="Método de medição (régua/tambor) é obrigatório para córrego.")
 
 
 def _fetch_item(db: Session, item_id: uuid.UUID) -> MonitoredItem:
