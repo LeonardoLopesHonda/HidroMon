@@ -56,3 +56,20 @@ class ItemCreateRequest(BaseModel):
     durh_number: str | None = None
     outorga_number: str | None = None
     barramento_durh: str | None = None
+
+
+class ItemUpdateRequest(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    name: str
+    limite_outorgado: float | None = None
+    unit: str | None = None
+    horas_operacao: int = 24
+    corrego_method: str | None = None
+    has_horimetro: bool = False
+    durh_number: str | None = None
+    outorga_number: str | None = None
+    barramento_durh: str | None = None

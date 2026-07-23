@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
 from app.db.database import get_db
-from app.models.item import ItemArchiveRequest, ItemCreateRequest, ItemResponse
+from app.models.item import ItemArchiveRequest, ItemCreateRequest, ItemResponse, ItemUpdateRequest
 from app.services import items as item_service
 
 router = APIRouter()
@@ -29,6 +29,16 @@ def create_item(
     _: str = Depends(get_current_user),
 ):
     return item_service.create_item(db, data)
+
+
+@router.put("/items/{item_id}", response_model=ItemResponse)
+def update_item(
+    item_id: uuid.UUID,
+    data: ItemUpdateRequest,
+    db: Session = Depends(get_db),
+    _: str = Depends(get_current_user),
+):
+    return item_service.update_item(db, item_id, data)
 
 
 @router.post("/items/{item_id}/archive", response_model=ItemResponse)
