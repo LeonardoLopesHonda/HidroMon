@@ -9,12 +9,14 @@ import {
   estimateBackfillValor,
   exceedanceChecks,
   expectedDailyDates,
+  expectedWeeklyDates,
   fieldBoundsForNewDate,
   hidrometroMonthStats,
   horasOperadas,
   horimetroBounds,
   measuredHoursPerDay,
   missingDailyDates,
+  missingWeeklyDates,
   monthEndProjection,
   monthlyCap,
   monthlyConsumption,
@@ -415,6 +417,40 @@ describe('missingDailyDates', () => {
       '2026-07-04',
       '2026-07-05',
     ]); // 2026-07-05 is a Sunday and still shows up
+  });
+});
+
+describe('expectedWeeklyDates', () => {
+  it('returns one Monday per calendar week for a past month', () => {
+    // June 2026: the 1st is a Monday, so every week's Monday falls in-month.
+    expect(expectedWeeklyDates(2026, 6, '2026-07-21')).toEqual(['2026-06-01', '2026-06-08', '2026-06-15', '2026-06-22', '2026-06-29']);
+  });
+
+  it('caps at the week containing today for the current month', () => {
+    // 2026-07-21 is a Tuesday; the week of 07-20 has started but 07-27 has not.
+    expect(expectedWeeklyDates(2026, 7, '2026-07-21')).toEqual(['2026-07-06', '2026-07-13', '2026-07-20']);
+  });
+
+  it('is empty for a month that has not started yet', () => {
+    expect(expectedWeeklyDates(2026, 8, '2026-07-21')).toEqual([]);
+  });
+
+  it('attributes a month-straddling week to whichever month its Monday falls in', () => {
+    // July 2026's last week starts Monday the 27th and spills into Aug 1-2.
+    expect(expectedWeeklyDates(2026, 7, '2026-07-31')).toContain('2026-07-27');
+    // August 2026 opens on a Saturday — its first Monday is Aug 3, not July 27.
+    expect(expectedWeeklyDates(2026, 8, '2026-08-31')).toEqual(['2026-08-03', '2026-08-10', '2026-08-17', '2026-08-24', '2026-08-31']);
+  });
+});
+
+describe('missingWeeklyDates', () => {
+  it('excludes weeks that already have a reading anywhere in their Mon–Sun span', () => {
+    const readings = [reading('2026-07-08', 1000), reading('2026-07-15', 1010)];
+    expect(missingWeeklyDates(readings, 2026, 7, '2026-07-21')).toEqual(['2026-07-20']);
+  });
+
+  it('flags every expected week as missing when there are no readings', () => {
+    expect(missingWeeklyDates([], 2026, 7, '2026-07-21')).toEqual(['2026-07-06', '2026-07-13', '2026-07-20']);
   });
 });
 

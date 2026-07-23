@@ -5,6 +5,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.db.database import Area, MonitoredItem
+from app.models.item import ItemCreateRequest
 from app.services import items as item_service
 
 
@@ -103,3 +104,79 @@ def test_unarchive_item_missing_raises_404(db_session):
     with pytest.raises(HTTPException) as exc_info:
         item_service.unarchive_item(db_session, uuid.uuid4())
     assert exc_info.value.status_code == 404
+
+
+@pytest.fixture
+def area(db_session):
+    area = _area()
+    db_session.add(area)
+    db_session.flush()
+    yield area
+    db_session.rollback()
+    db_session.query(MonitoredItem).filter(MonitoredItem.area_id == area.id).delete()
+    db_session.query(Area).filter(Area.id == area.id).delete()
+    db_session.commit()
+
+
+def _create_request(area_id, **overrides):
+    kwargs = dict(id=uuid.uuid4(), area_id=area_id, name="Pluviômetro 1", type="pluviometro")
+    kwargs.update(overrides)
+    return ItemCreateRequest(**kwargs)
+
+
+def test_create_item_defaults_to_enabled(db_session, area):
+    created = item_service.create_item(db_session, _create_request(area.id))
+
+    assert created.disabled is False
+    assert created.horas_operacao == 24
+    assert created.archived_at is None
+
+
+def test_create_item_hidrometro_allows_null_outorga_fields(db_session, area):
+    created = item_service.create_item(
+        db_session,
+        _create_request(area.id, name="Hidrômetro 1", type="hidrometro"),
+    )
+
+    assert created.limite_outorgado is None
+    assert created.durh_number is None
+    assert created.outorga_number is None
+
+
+def test_create_item_corrego_requires_method(db_session, area):
+    with pytest.raises(HTTPException) as exc_info:
+        item_service.create_item(db_session, _create_request(area.id, name="Córrego 1", type="corrego"))
+    assert exc_info.value.status_code == 422
+
+
+def test_create_item_corrego_accepts_valid_method(db_session, area):
+    created = item_service.create_item(
+        db_session,
+        _create_request(area.id, name="Córrego 1", type="corrego", corrego_method="regua"),
+    )
+
+    assert created.corrego_method == "regua"
+
+
+def test_create_item_rejects_blank_name(db_session, area):
+    with pytest.raises(HTTPException) as exc_info:
+        item_service.create_item(db_session, _create_request(area.id, name="   "))
+    assert exc_info.value.status_code == 422
+
+
+def test_create_item_rejects_invalid_type(db_session, area):
+    with pytest.raises(HTTPException) as exc_info:
+        item_service.create_item(db_session, _create_request(area.id, type="poco"))
+    assert exc_info.value.status_code == 422
+
+
+def test_create_item_missing_area_raises_404(db_session):
+    with pytest.raises(HTTPException) as exc_info:
+        item_service.create_item(db_session, _create_request(uuid.uuid4()))
+    assert exc_info.value.status_code == 404
+
+
+def test_create_item_duplicate_id_raises_409(db_session, area, item):
+    with pytest.raises(HTTPException) as exc_info:
+        item_service.create_item(db_session, _create_request(area.id, id=item.id))
+    assert exc_info.value.status_code == 409

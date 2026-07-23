@@ -3,6 +3,7 @@ import { getAreas, getItems, getReadings } from '@/lib/api/resources';
 import { ApiError } from '@/lib/api/client';
 import { PageShell } from '@/components/PageShell';
 import { MonthSelector, currentMonth, type SelectedMonth } from '@/components/shared/MonthSelector';
+import { ActiveOnlyFilter } from '@/components/shared/ActiveOnlyFilter';
 import { ComplianceCard } from '@/components/overview/ComplianceCard';
 import { CompactCard } from '@/components/overview/CompactCard';
 import { AreaPluviometroMaxChart, type AreaPluviometroSeries } from '@/components/overview/charts/AreaPluviometroMaxChart';
@@ -17,6 +18,7 @@ export function OverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<SelectedMonth>(currentMonth());
+  const [activeOnly, setActiveOnly] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,13 +56,13 @@ export function OverviewPage() {
   const itemsByArea = useMemo(() => {
     const map = new Map<string, MonitoredItem[]>();
     for (const item of items) {
-      if (item.disabled) continue;
+      if (activeOnly && item.disabled) continue;
       const list = map.get(item.areaId) ?? [];
       list.push(item);
       map.set(item.areaId, list);
     }
     return map;
-  }, [items]);
+  }, [items, activeOnly]);
 
   // Local calendar date, not UTC — must agree with currentMonth()'s local
   // getFullYear()/getMonth(), or the two can disagree for hours around UTC midnight
@@ -73,7 +75,10 @@ export function OverviewPage() {
     <PageShell>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 22 }}>
         <h1 style={{ margin: 0, font: '600 18px var(--font-sans)', color: 'var(--color-text)' }}>Visão Geral</h1>
-        <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <ActiveOnlyFilter checked={activeOnly} onChange={setActiveOnly} />
+          <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
+        </div>
       </div>
 
       {loading && (

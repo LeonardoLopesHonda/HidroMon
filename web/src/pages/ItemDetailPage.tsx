@@ -182,8 +182,12 @@ export function ItemDetailPage() {
               pluviometroReadings={pluviometroReadings}
             />
           )}
-          {item.type === 'pluviometro' && <PluviometroDetail key={item.id} readings={itemReadings} selectedMonth={selectedMonth} />}
-          {item.type === 'corrego' && <CorregoDetail key={item.id} item={item} readings={itemReadings} selectedMonth={selectedMonth} />}
+          {item.type === 'pluviometro' && (
+            <PluviometroDetail key={item.id} itemId={item.id} readings={itemReadings} selectedMonth={selectedMonth} onReadingUpdated={handleReadingUpdated} />
+          )}
+          {item.type === 'corrego' && (
+            <CorregoDetail key={item.id} item={item} area={area} readings={itemReadings} selectedMonth={selectedMonth} onReadingUpdated={handleReadingUpdated} />
+          )}
         </div>
       )}
     </PageShell>

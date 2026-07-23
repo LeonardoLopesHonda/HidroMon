@@ -36,3 +36,23 @@ class ItemResponse(BaseModel):
 
 class ItemArchiveRequest(BaseModel):
     reason: str
+
+
+class ItemCreateRequest(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    id: uuid.UUID
+    area_id: uuid.UUID
+    name: str
+    type: str
+    limite_outorgado: float | None = None
+    unit: str | None = None
+    horas_operacao: int = 24
+    corrego_method: str | None = None
+    has_horimetro: bool = False
+    durh_number: str | None = None
+    outorga_number: str | None = None
+    barramento_durh: str | None = None
