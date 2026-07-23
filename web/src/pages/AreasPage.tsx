@@ -4,6 +4,7 @@ import { getAreas, getItems, getReadings } from '@/lib/api/resources';
 import { ApiError } from '@/lib/api/client';
 import { PageShell } from '@/components/PageShell';
 import { Badge } from '@/components/ui/Badge';
+import { ActiveOnlyFilter } from '@/components/shared/ActiveOnlyFilter';
 import { formatDateBR } from '@/lib/format';
 import type { Area, MonitoredItem, MonitoringType, Reading } from '@/types';
 
@@ -25,6 +26,7 @@ export function AreasPage() {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeOnly, setActiveOnly] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,15 +54,20 @@ export function AreasPage() {
   const itemsByArea = useMemo(() => {
     const map = new Map<string, MonitoredItem[]>();
     for (const item of items) {
+      if (activeOnly && item.disabled) continue;
       const list = map.get(item.areaId) ?? [];
       list.push(item);
       map.set(item.areaId, list);
     }
     return map;
-  }, [items]);
+  }, [items, activeOnly]);
 
   return (
     <PageShell>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+        <ActiveOnlyFilter checked={activeOnly} onChange={setActiveOnly} />
+      </div>
+
       {loading && (
         <p style={{ font: '400 13px var(--font-sans)', color: 'var(--color-text-muted)' }}>Carregando…</p>
       )}
