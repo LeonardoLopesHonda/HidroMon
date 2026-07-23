@@ -75,7 +75,7 @@ export function OverviewPage() {
     <PageShell>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 22 }}>
         <h1 style={{ margin: 0, font: '600 18px var(--font-sans)', color: 'var(--color-text)' }}>Visão Geral</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
           <ActiveOnlyFilter checked={activeOnly} onChange={setActiveOnly} />
           <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
         </div>
