@@ -40,3 +40,17 @@ export interface ItemCreateInput {
 }
 
 export const createItem = (body: ItemCreateInput) => apiClient.post<MonitoredItem>('/items', body);
+
+export interface ItemUpdateInput {
+  name: string;
+  limiteOutorgado?: number | null;
+  unit?: string | null;
+  horasOperacao?: number;
+  corregoMethod?: MonitoredItem['corregoMethod'];
+  hasHorimetro?: boolean;
+  durhNumber?: string | null;
+  outorgaNumber?: string | null;
+  barramentoDurh?: string | null;
+}
+
+export const updateItem = (id: string, body: ItemUpdateInput) => apiClient.put<MonitoredItem>(`/items/${id}`, body);
