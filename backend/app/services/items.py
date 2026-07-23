@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.database import Area, MonitoredItem
-from app.models.item import ItemCreateRequest
+from app.models.item import ItemCreateRequest, ItemUpdateRequest
 
 VALID_TYPES = {"hidrometro", "pluviometro", "corrego"}
 VALID_CORREGO_METHODS = {"regua", "tambor"}
@@ -87,12 +87,40 @@ def create_item(db: Session, data: ItemCreateRequest) -> MonitoredItem:
     return item
 
 
+def update_item(db: Session, item_id: uuid.UUID, data: ItemUpdateRequest) -> MonitoredItem:
+    item = _fetch_item(db, item_id)
+    _validate_name(data.name)
+    _validate_type_fields(item.type, data.corrego_method)
+
+    item.name = data.name.strip()
+    item.limite_outorgado = data.limite_outorgado
+    item.unit = data.unit
+    item.horas_operacao = data.horas_operacao
+    item.corrego_method = data.corrego_method
+    item.has_horimetro = data.has_horimetro
+    item.durh_number = data.durh_number
+    item.outorga_number = data.outorga_number
+    item.barramento_durh = data.barramento_durh
+    item.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
 def _validate_create(data: ItemCreateRequest) -> None:
-    if not data.name or not data.name.strip():
-        raise HTTPException(status_code=422, detail="Nome do item é obrigatório.")
+    _validate_name(data.name)
     if data.type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Tipo de item inválido: {data.type}")
-    if data.type == "corrego" and data.corrego_method not in VALID_CORREGO_METHODS:
+    _validate_type_fields(data.type, data.corrego_method)
+
+
+def _validate_name(name: str) -> None:
+    if not name or not name.strip():
+        raise HTTPException(status_code=422, detail="Nome do item é obrigatório.")
+
+
+def _validate_type_fields(type_: str, corrego_method: str | None) -> None:
+    if type_ == "corrego" and corrego_method not in VALID_CORREGO_METHODS:
         raise HTTPException(status_code=422, detail="Método de medição (régua/tambor) é obrigatório para córrego.")
 
 

@@ -10,6 +10,7 @@ import { PluviometroDetail } from '@/components/item-detail/PluviometroDetail';
 import { CorregoDetail } from '@/components/item-detail/CorregoDetail';
 import { ReadingsExportDialog } from '@/components/item-detail/ReadingsExportDialog';
 import { ArchiveItemDialog } from '@/components/item-detail/ArchiveItemDialog';
+import { EditItemDialog } from '@/components/item-detail/EditItemDialog';
 import { MonthSelector, currentMonth, type SelectedMonth } from '@/components/shared/MonthSelector';
 import type { Area, MonitoredItem, MonitoringType, Reading } from '@/types';
 
@@ -30,6 +31,7 @@ export function ItemDetailPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,6 +131,21 @@ export function ItemDetailPage() {
               >
                 Baixar .xlsx
               </button>
+              <button
+                type="button"
+                onClick={() => setEditOpen(true)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 8,
+                  border: '1px solid var(--color-border-input)',
+                  background: 'var(--color-surface)',
+                  color: 'var(--color-text)',
+                  font: '600 12px var(--font-sans)',
+                  cursor: 'pointer',
+                }}
+              >
+                Editar item
+              </button>
               {item.disabled ? (
                 <button
                   type="button"
@@ -170,6 +187,7 @@ export function ItemDetailPage() {
 
           {exportOpen && <ReadingsExportDialog item={item} selectedMonth={selectedMonth} onClose={() => setExportOpen(false)} />}
           {archiveOpen && <ArchiveItemDialog item={item} onArchived={handleItemUpdated} onClose={() => setArchiveOpen(false)} />}
+          {editOpen && <EditItemDialog item={item} onUpdated={handleItemUpdated} onClose={() => setEditOpen(false)} />}
 
           {item.type === 'hidrometro' && (
             <HidrometroDetail

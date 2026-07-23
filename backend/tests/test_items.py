@@ -5,7 +5,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.db.database import Area, MonitoredItem
-from app.models.item import ItemCreateRequest
+from app.models.item import ItemCreateRequest, ItemUpdateRequest
 from app.services import items as item_service
 
 
@@ -180,3 +180,46 @@ def test_create_item_duplicate_id_raises_409(db_session, area, item):
     with pytest.raises(HTTPException) as exc_info:
         item_service.create_item(db_session, _create_request(area.id, id=item.id))
     assert exc_info.value.status_code == 409
+
+
+def _update_request(**overrides):
+    kwargs = dict(name="Poço 1 renomeado", horas_operacao=20)
+    kwargs.update(overrides)
+    return ItemUpdateRequest(**kwargs)
+
+
+def test_update_item_fills_in_outorga_fields(db_session, item):
+    updated = item_service.update_item(
+        db_session,
+        item.id,
+        _update_request(durh_number="DURH-1", outorga_number="OUT-1", limite_outorgado=12.5, unit="m³/h"),
+    )
+
+    assert updated.name == "Poço 1 renomeado"
+    assert updated.horas_operacao == 20
+    assert updated.durh_number == "DURH-1"
+    assert updated.outorga_number == "OUT-1"
+    assert updated.limite_outorgado == 12.5
+    assert updated.unit == "m³/h"
+
+
+def test_update_item_rejects_blank_name(db_session, item):
+    with pytest.raises(HTTPException) as exc_info:
+        item_service.update_item(db_session, item.id, _update_request(name="   "))
+    assert exc_info.value.status_code == 422
+
+
+def test_update_item_corrego_requires_method(db_session, area):
+    corrego = _item(area.id, id=uuid.uuid4(), type="corrego", corrego_method="regua", has_horimetro=False)
+    db_session.add(corrego)
+    db_session.flush()
+
+    with pytest.raises(HTTPException) as exc_info:
+        item_service.update_item(db_session, corrego.id, _update_request(corrego_method=None))
+    assert exc_info.value.status_code == 422
+
+
+def test_update_item_missing_raises_404(db_session):
+    with pytest.raises(HTTPException) as exc_info:
+        item_service.update_item(db_session, uuid.uuid4(), _update_request())
+    assert exc_info.value.status_code == 404
