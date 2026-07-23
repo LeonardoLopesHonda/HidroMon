@@ -5,6 +5,7 @@ import { ApiError } from '@/lib/api/client';
 import { PageShell } from '@/components/PageShell';
 import { Badge } from '@/components/ui/Badge';
 import { ActiveOnlyFilter } from '@/components/shared/ActiveOnlyFilter';
+import { CreateItemDialog } from '@/components/areas/CreateItemDialog';
 import { formatDateBR } from '@/lib/format';
 import type { Area, MonitoredItem, MonitoringType, Reading } from '@/types';
 
@@ -27,6 +28,7 @@ export function AreasPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeOnly, setActiveOnly] = useState(true);
+  const [createAreaId, setCreateAreaId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,11 +64,22 @@ export function AreasPage() {
     return map;
   }, [items, activeOnly]);
 
+  const createArea = useMemo(() => areas.find((a) => a.id === createAreaId), [areas, createAreaId]);
+
   return (
     <PageShell>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
         <ActiveOnlyFilter checked={activeOnly} onChange={setActiveOnly} />
       </div>
+
+      {createArea && (
+        <CreateItemDialog
+          areaId={createArea.id}
+          areaName={createArea.name}
+          onCreated={(created) => setItems((its) => [...its, created])}
+          onClose={() => setCreateAreaId(null)}
+        />
+      )}
 
       {loading && (
         <p style={{ font: '400 13px var(--font-sans)', color: 'var(--color-text-muted)' }}>Carregando…</p>
@@ -80,21 +93,38 @@ export function AreasPage() {
             const areaItems = itemsByArea.get(area.id) ?? [];
             return (
               <section key={area.id}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-                  <h2
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+                    <h2
+                      style={{
+                        margin: 0,
+                        font: '600 12px var(--font-sans)',
+                        color: 'var(--color-text-muted)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '.07em',
+                      }}
+                    >
+                      {area.name}
+                    </h2>
+                    <span style={{ font: '400 11px var(--font-sans)', color: 'var(--color-text-faint)' }}>
+                      {areaItems.length} {areaItems.length === 1 ? 'ponto monitorado' : 'pontos monitorados'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCreateAreaId(area.id)}
                     style={{
-                      margin: 0,
-                      font: '600 12px var(--font-sans)',
-                      color: 'var(--color-text-muted)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '.07em',
+                      padding: '5px 12px',
+                      borderRadius: 8,
+                      border: '1px solid var(--color-border-input)',
+                      background: 'var(--color-surface)',
+                      color: 'var(--color-text)',
+                      font: '600 11.5px var(--font-sans)',
+                      cursor: 'pointer',
                     }}
                   >
-                    {area.name}
-                  </h2>
-                  <span style={{ font: '400 11px var(--font-sans)', color: 'var(--color-text-faint)' }}>
-                    {areaItems.length} {areaItems.length === 1 ? 'ponto monitorado' : 'pontos monitorados'}
-                  </span>
+                    + Novo item
+                  </button>
                 </div>
                 <div
                   style={{

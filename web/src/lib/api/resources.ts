@@ -23,3 +23,20 @@ export const archiveItem = (id: string, reason: string) =>
   apiClient.post<MonitoredItem>(`/items/${id}/archive`, { reason });
 
 export const unarchiveItem = (id: string) => apiClient.post<MonitoredItem>(`/items/${id}/unarchive`, {});
+
+export interface ItemCreateInput {
+  id: string;
+  areaId: string;
+  name: string;
+  type: MonitoredItem['type'];
+  limiteOutorgado?: number | null;
+  unit?: string | null;
+  horasOperacao?: number;
+  corregoMethod?: MonitoredItem['corregoMethod'];
+  hasHorimetro?: boolean;
+  durhNumber?: string | null;
+  outorgaNumber?: string | null;
+  barramentoDurh?: string | null;
+}
+
+export const createItem = (body: ItemCreateInput) => apiClient.post<MonitoredItem>('/items', body);
