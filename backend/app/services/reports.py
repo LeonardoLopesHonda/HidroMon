@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.db.database import MonitoredItem, Reading
 
 TEMPLATE_PATH = (
-    Path(__file__).resolve().parents[3] / "docs" / "templates" / "formulario-monitoramento-captacao.xlsx"
+    Path(__file__).resolve().parents[1] / "templates" / "formulario-monitoramento-captacao.xlsx"
 )
 
 MONTH_LABELS_PT = [
